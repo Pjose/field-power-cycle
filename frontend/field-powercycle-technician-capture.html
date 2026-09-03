@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Field PowerCycle · Technician</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#151E28; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:#05070A;font-family:'Inter',system-ui,sans-serif;color:var(--text);height:100%;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  .phone{max-width:400px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;display:flex;flex-direction:column;overflow-x:hidden;}
+
+  /* status bar */
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px 2px;font-family:'IBM Plex Mono';font-size:11px;color:var(--text-dim);flex-shrink:0;}
+  .signal{display:flex;align-items:center;gap:5px;}
+  .signal .bars{display:flex;gap:2px;align-items:flex-end;}
+  .signal .bars i{width:3px;background:var(--text-dim);border-radius:1px;display:block;}
+  .signal .bars i:nth-child(1){height:4px;} .signal .bars i:nth-child(2){height:6px;} .signal .bars i:nth-child(3){height:8px;} .signal .bars i:nth-child(4){height:10px;}
+
+  /* app header */
+  .app-header{padding:14px 18px 12px;flex-shrink:0;}
+  .header-top{display:flex;align-items:center;justify-content:space-between;}
+  .back{width:32px;height:32px;border-radius:9px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);}
+  .sync-pill{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--text-faint);font-family:'IBM Plex Mono';background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;}
+  .sync-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+  .sync-pill.syncing .dot{background:var(--amber);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  .job-banner{margin-top:14px;}
+  .job-id-row{display:flex;align-items:center;gap:8px;}
+  .job-id-row .id{font-family:'IBM Plex Mono';font-size:11px;color:var(--text-faint);}
+  .pill-mini{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--green-dim);color:var(--green);}
+  .job-title{font-family:'Space Grotesk';font-size:19px;font-weight:600;margin-top:4px;}
+  .job-addr{font-size:12.5px;color:var(--text-dim);margin-top:3px;}
+
+  .geofence-strip{margin-top:12px;display:flex;align-items:center;gap:8px;background:var(--green-dim);border:1px solid #245944;color:var(--green);font-size:11px;padding:8px 11px;border-radius:9px;}
+  .geofence-strip svg{width:14px;height:14px;flex-shrink:0;}
+
+  /* progress */
+  .progress-wrap{padding:0 18px;margin-top:16px;flex-shrink:0;}
+  .progress-head{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-dim);margin-bottom:7px;}
+  .progress-track{height:6px;background:var(--panel-2);border-radius:6px;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:6px;transition:width .4s ease;}
+
+  /* checklist / scroll body */
+  .body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;}
+
+  .task-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px;transition:.15s;}
+  .task-card.complete{border-color:#245944;background:#101B17;}
+  .task-top{display:flex;align-items:flex-start;gap:11px;}
+  .task-check{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+  .task-check.done{background:var(--green);border-color:var(--green);}
+  .task-check.done svg{width:13px;height:13px;stroke:#04140E;}
+  .task-check svg{stroke-width:3;fill:none;stroke:currentColor;}
+  .task-text{flex:1;}
+  .task-name{font-size:14px;font-weight:600;}
+  .task-hint{font-size:11.5px;color:var(--text-faint);margin-top:2px;line-height:1.4;}
+
+  .thumb-row{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap;}
+  .thumb{width:60px;height:60px;border-radius:9px;position:relative;overflow:hidden;flex-shrink:0;border:1px solid var(--line);}
+  .thumb .badge{position:absolute;bottom:2px;right:2px;width:15px;height:15px;border-radius:50%;background:rgba(6,10,14,.85);display:flex;align-items:center;justify-content:center;}
+  .thumb .badge svg{width:9px;height:9px;stroke:var(--green);stroke-width:3;}
+  .thumb .badge.pending svg{stroke:var(--amber);}
+  .thumb.add{background:var(--panel-2);border:1.5px dashed var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer;}
+  .thumb.add:active{transform:scale(.94);}
+  .thumb.add svg{width:20px;height:20px;}
+
+  /* capture sheet */
+  .sheet-backdrop{position:fixed;inset:0;background:rgba(4,6,8,.7);z-index:30;opacity:0;pointer-events:none;transition:.2s;}
+  .sheet-backdrop.open{opacity:1;pointer-events:auto;}
+  .sheet{position:fixed;left:50%;bottom:0;transform:translate(-50%,100%);width:100%;max-width:400px;background:var(--panel);border-radius:20px 20px 0 0;border:1px solid var(--line);border-bottom:none;z-index:31;transition:.28s cubic-bezier(.4,0,.2,1);padding-bottom:env(safe-area-inset-bottom,20px);}
+  .sheet.open{transform:translate(-50%,0);}
+  .sheet-handle{width:36px;height:4px;background:var(--line);border-radius:4px;margin:10px auto 4px;}
+
+  .viewfinder{margin:14px 18px 0;height:230px;border-radius:14px;background:radial-gradient(circle at 30% 20%,#1D3A4E,#0A1016 70%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+  .viewfinder .grid-line{position:absolute;background:rgba(255,255,255,.08);}
+  .viewfinder .frame-corner{position:absolute;width:22px;height:22px;border-color:var(--green);}
+  .vf-hint{color:var(--text-faint);font-size:11.5px;text-align:center;padding:0 30px;font-family:'IBM Plex Mono';}
+  .vf-stamp{position:absolute;bottom:10px;left:10px;right:10px;background:rgba(6,10,14,.7);border-radius:8px;padding:8px 10px;font-family:'IBM Plex Mono';font-size:9.5px;color:#CFE0EE;line-height:1.6;opacity:0;transition:.2s;}
+  .vf-stamp.show{opacity:1;}
+
+  .capture-controls{display:flex;align-items:center;justify-content:center;gap:26px;margin-top:18px;}
+  .shutter{width:66px;height:66px;border-radius:50%;background:#fff;border:4px solid #2A3644;cursor:pointer;transition:.1s;}
+  .shutter:active{transform:scale(.9);}
+  .mode-toggle{display:flex;background:var(--panel-2);border-radius:20px;padding:3px;border:1px solid var(--line);}
+  .mode-btn{padding:6px 13px;border-radius:16px;font-size:11px;font-weight:600;color:var(--text-faint);cursor:pointer;}
+  .mode-btn.active{background:var(--blue);color:#06141F;}
+
+  .sheet-cap-label{text-align:center;font-size:12.5px;color:var(--text-dim);margin-top:16px;padding:0 30px 22px;}
+  .sheet-cap-label b{color:var(--text);}
+
+  /* verify overlay */
+  .verify-screen{padding:34px 26px 30px;text-align:center;}
+  .verify-icon{width:64px;height:64px;border-radius:50%;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:var(--amber-dim);border:2px solid var(--amber);}
+  .verify-icon.ok{background:var(--green-dim);border-color:var(--green);}
+  .verify-icon svg{width:28px;height:28px;stroke-width:2.5;}
+  .verify-icon .spin{animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .verify-title{font-family:'Space Grotesk';font-size:17px;font-weight:600;}
+  .verify-detail{font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.6;font-family:'IBM Plex Mono';}
+  .verify-row{display:flex;justify-content:space-between;font-size:12px;padding:9px 0;border-bottom:1px solid var(--line-soft);}
+  .verify-row .l{color:var(--text-faint);} .verify-row .v{color:var(--text);font-family:'IBM Plex Mono';}
+  .verify-list{margin-top:18px;text-align:left;}
+  .verify-check{color:var(--green);}
+
+  .btn{border:none;font-family:'Inter';font-weight:700;font-size:14px;padding:14px;border-radius:12px;cursor:pointer;width:100%;}
+  .btn.primary{background:var(--green);color:#04140E;}
+  .btn.ghost{background:var(--panel-2);color:var(--text-dim);border:1px solid var(--line);margin-top:8px;}
+  .btn:active{transform:scale(.98);}
+
+  /* footer submit */
+  .footer{padding:14px 18px 22px;flex-shrink:0;border-top:1px solid var(--line);background:linear-gradient(0deg,#0C1116,#0B0F14);}
+  .footer-sub{font-size:11.5px;color:var(--text-faint);text-align:center;margin-top:9px;}
+
+  .toast{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-140%);background:var(--panel);border:1px solid var(--green);padding:10px 16px;border-radius:10px;font-size:12px;display:flex;align-items:center;gap:8px;z-index:50;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.5);}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .toast svg{width:14px;height:14px;stroke:var(--green);}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="signal">
+      <div class="bars"><i></i><i></i><i></i><i></i></div>
+      <span>LTE</span>
+    </div>
+  </div>
+
+  <div class="app-header">
+    <div class="header-top">
+      <div class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></div>
+      <div class="sync-pill" id="sync-pill"><span class="dot"></span><span id="sync-text">All synced</span></div>
+    </div>
+    <div class="job-banner">
+      <div class="job-id-row"><span class="id mono">JB-4472</span><span class="pill-mini">ON SITE</span></div>
+      <div class="job-title">Apex Dining Brands — Uptown</div>
+      <div class="job-addr">Break-Fix — Payment Terminal · Bay 3</div>
+    </div>
+    <div class="geofence-strip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      Location confirmed inside job geofence — captures will auto-verify
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-head"><span>Proof of work</span><span class="mono" id="progress-count">0 / 3 verified</span></div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="body" id="task-body"></div>
+
+  <div class="footer">
+    <button class="btn primary" id="submit-btn" disabled>Complete job — no paperwork needed</button>
+    <div class="footer-sub">Closing auto-generates the client-visible completion report</div>
+  </div>
+</div>
+
+<!-- Capture sheet -->
+<div class="sheet-backdrop" id="sheet-backdrop"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheet-capture">
+    <div class="viewfinder" id="viewfinder">
+      <div class="frame-corner" style="top:14px;left:14px;border-top:2px solid var(--green);border-left:2px solid var(--green);border-radius:6px 0 0 0;"></div>
+      <div class="frame-corner" style="top:14px;right:14px;border-top:2px solid var(--green);border-right:2px solid var(--green);border-radius:0 6px 0 0;"></div>
+      <div class="frame-corner" style="bottom:14px;left:14px;border-bottom:2px solid var(--green);border-left:2px solid var(--green);border-radius:0 0 0 6px;"></div>
+      <div class="frame-corner" style="bottom:14px;right:14px;border-bottom:2px solid var(--green);border-right:2px solid var(--green);border-radius:0 0 6px 0;"></div>
+      <div class="vf-hint" id="vf-hint">Frame the payment terminal so the serial label is visible</div>
+      <div class="vf-stamp" id="vf-stamp"></div>
+    </div>
+    <div class="mode-toggle" style="width:fit-content;margin:16px auto 0;">
+      <div class="mode-btn active" data-mode="PHOTO">Photo</div>
+      <div class="mode-btn" data-mode="VIDEO">Video</div>
+    </div>
+    <div class="capture-controls">
+      <div class="shutter" id="shutter"></div>
+    </div>
+    <div class="sheet-cap-label" id="sheet-label">Capturing for: <b>Diagnostic run recorded</b></div>
+  </div>
+
+  <div id="sheet-verify" style="display:none;"></div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg><span id="toast-text">Saved</span></div>
+
+<script>
+const TASKS = [
+  {id:'t1', name:'Diagnostic run recorded', hint:'Capture the terminal error screen or diagnostic tool output.', shots:[]},
+  {id:'t2', name:'Replacement unit installed', hint:'Photo of the new unit mounted and cabled.', shots:[]},
+  {id:'t3', name:'Transaction test passed', hint:'Video of a completed test transaction on the terminal.', shots:[]},
+];
+
+const CHECKLIST_HINTS = {
+  'Diagnostic run recorded': 'Capture the terminal error screen or diagnostic tool output.',
+  'Replacement unit installed': 'Photo of the new unit mounted and cabled.',
+  'Transaction test passed': 'Video of a completed test transaction on the terminal.',
+};
+
+/* ---- Live backend wiring ----
+   Paints instantly with the TASKS above, then tries to load the real job
+   (same JB-4472 used across the other prototypes) from the backend. If
+   reachable, TASKS gets rebuilt with real checklist IDs and real capture
+   state, and the shutter button starts calling the real verification
+   engine instead of simulating locally. */
+const API_BASE = 'http://127.0.0.1:8000';
+const JOB_ID = 'JB-4472';
+const TECH_ID = 'T-092'; // Priya Chandran — matches this job's assigned tech in the seed data
+let JOB_SITE = {lat: 32.7920, lng: -96.8010, name: 'Apex Dining Brands — Uptown'};
+let LIVE = false;
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function getDeviceLocation(fallbackLat, fallbackLng){
+  return new Promise((resolve)=>{
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+        ()  => resolve({lat: fallbackLat + (Math.random()-0.5)*0.0003, lng: fallbackLng + (Math.random()-0.5)*0.0003}),
+        {timeout: 2000, maximumAge: 30000}
+      );
+    } else {
+      resolve({lat: fallbackLat + (Math.random()-0.5)*0.0003, lng: fallbackLng + (Math.random()-0.5)*0.0003});
+    }
+  });
+}
+
+async function loadJobFromAPI(){
+  try{
+    const [job, captures] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/jobs/${JOB_ID}`),
+      fetchJSON(`${API_BASE}/v1/jobs/${JOB_ID}/captures`),
+    ]);
+    JOB_SITE = {lat: job.site.lat, lng: job.site.lng, name: job.site.name};
+
+    const shotsByChecklist = {};
+    captures.forEach(c=>{
+      if(!c.checklist_item_id) return;
+      if(!shotsByChecklist[c.checklist_item_id]) shotsByChecklist[c.checklist_item_id] = [];
+      shotsByChecklist[c.checklist_item_id].push({
+        verified: c.status==='verified' || c.status==='resolved_approved',
+        grad: GRADS[shotsByChecklist[c.checklist_item_id].length % GRADS.length],
+      });
+    });
+
+    TASKS.length = 0;
+    job.checklist.forEach(c=>{
+      TASKS.push({
+        id: c.id, name: c.label,
+        hint: CHECKLIST_HINTS[c.label] || 'Capture proof for this step.',
+        shots: shotsByChecklist[c.id] || [],
+      });
+    });
+
+    LIVE = true;
+    document.getElementById('sync-text').textContent = 'Live · connected to dispatch';
+    document.querySelector('.sync-pill .dot').style.background = 'var(--blue)';
+    renderTasks();
+  }catch(err){
+    LIVE = false;
+    document.getElementById('sync-text').textContent = 'Demo mode — backend offline';
+  }
+}
+
+let activeTask = null;
+let captureMode = 'PHOTO';
+
+const body = document.getElementById('task-body');
+
+function coords(){
+  const lat = (32.7767 + (Math.random()-0.5)*0.0006).toFixed(5);
+  const lng = (-96.7970 + (Math.random()-0.5)*0.0006).toFixed(5);
+  return `${lat}°N ${Math.abs(lng)}°W`;
+}
+function nowStr(){ return new Date().toLocaleTimeString('en-US',{hour12:true}); }
+
+function renderTasks(){
+  body.innerHTML = '';
+  TASKS.forEach(t=>{
+    const done = t.shots.some(s=>s.verified);
+    const card = document.createElement('div');
+    card.className = 'task-card'+(done?' complete':'');
+    card.innerHTML = `
+      <div class="task-top">
+        <div class="task-check ${done?'done':''}">${done?'<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+        <div class="task-text">
+          <div class="task-name">${t.name}</div>
+          <div class="task-hint">${t.hint}</div>
+        </div>
+      </div>
+      <div class="thumb-row">
+        ${t.shots.map(s=>`
+          <div class="thumb" style="background:${s.grad}">
+            <div class="badge ${s.verified?'':'pending'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">${s.verified?'<path d=\"M5 13l4 4L19 7\"/>':'<circle cx=\"12\" cy=\"12\" r=\"5\"/>'}</svg></div>
+          </div>
+        `).join('')}
+        <div class="thumb add" data-task="${t.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8a2 2 0 012-2h1.5l1-1.5h7l1 1.5H18a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"/><circle cx="12" cy="13" r="3.2"/></svg></div>
+      </div>
+    `;
+    body.appendChild(card);
+  });
+  document.querySelectorAll('.thumb.add').forEach(el=>{
+    el.addEventListener('click',()=>openSheet(el.dataset.task));
+  });
+  updateProgress();
+}
+
+function updateProgress(){
+  const verifiedCount = TASKS.filter(t=>t.shots.some(s=>s.verified)).length;
+  document.getElementById('progress-count').textContent = `${verifiedCount} / ${TASKS.length} verified`;
+  document.getElementById('progress-fill').style.width = (verifiedCount/TASKS.length*100)+'%';
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.disabled = verifiedCount < TASKS.length;
+  submitBtn.style.opacity = submitBtn.disabled ? .45 : 1;
+}
+
+/* ---- sheet ---- */
+const sheet = document.getElementById('sheet');
+const sheetBackdrop = document.getElementById('sheet-backdrop');
+const GRADS = ['linear-gradient(135deg,#1D3A4E,#0A1016)','linear-gradient(135deg,#1D4E42,#0A1612)','linear-gradient(135deg,#4E3D1D,#16120A)'];
+
+function openSheet(taskId){
+  activeTask = TASKS.find(t=>t.id===taskId);
+  document.getElementById('sheet-capture').style.display='block';
+  document.getElementById('sheet-verify').style.display='none';
+  document.getElementById('sheet-label').innerHTML = `Capturing for: <b>${activeTask.name}</b>`;
+  document.getElementById('vf-hint').textContent = activeTask.hint;
+  document.getElementById('vf-stamp').classList.remove('show');
+  sheet.classList.add('open'); sheetBackdrop.classList.add('open');
+}
+function closeSheet(){ sheet.classList.remove('open'); sheetBackdrop.classList.remove('open'); }
+sheetBackdrop.addEventListener('click', closeSheet);
+
+document.querySelectorAll('.mode-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); captureMode = b.dataset.mode;
+  });
+});
+
+document.getElementById('shutter').addEventListener('click', async ()=>{
+  const stamp = document.getElementById('vf-stamp');
+  const timeStr = nowStr();
+  const loc = await getDeviceLocation(JOB_SITE.lat, JOB_SITE.lng);
+  const locStr = `${loc.lat.toFixed(5)}°N ${Math.abs(loc.lng).toFixed(5)}°W`;
+  stamp.innerHTML = `${timeStr} · ${locStr}<br>${JOB_ID} · ${JOB_SITE.name}`;
+  stamp.classList.add('show');
+  navigator.vibrate && navigator.vibrate(12);
+  setTimeout(()=> {
+    if(LIVE) showVerifyLive(timeStr, locStr, loc);
+    else showVerify(timeStr, locStr);
+  }, 550);
+});
+
+function showVerify(timeStr, locStr){
+  document.getElementById('sheet-capture').style.display='none';
+  const v = document.getElementById('sheet-verify');
+  v.style.display='block';
+  const online = navigator.onLine !== false;
+  v.innerHTML = `
+    <div class="verify-screen">
+      <div class="verify-icon" id="v-icon">
+        <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-linecap="round"><path d="M12 3a9 9 0 100 18"/></svg>
+      </div>
+      <div class="verify-title" id="v-title">Verifying capture…</div>
+      <div class="verify-detail" id="v-detail">Matching timestamp and GPS to job geofence</div>
+      <div style="margin-top:20px;">
+        <div class="verify-row"><span class="l">Captured</span><span class="v">${timeStr}</span></div>
+        <div class="verify-row"><span class="l">Location</span><span class="v">${locStr}</span></div>
+        <div class="verify-row"><span class="l">Job site</span><span class="v">32.77°N 96.80°W</span></div>
+        <div class="verify-row"><span class="l">Distance from site</span><span class="v" id="v-dist">—</span></div>
+      </div>
+      <button class="btn ghost" id="v-close" style="margin-top:20px;">Retake</button>
+    </div>
+  `;
+  document.getElementById('v-close').addEventListener('click', closeSheet);
+
+  setTimeout(()=>{
+    const icon = document.getElementById('v-icon');
+    icon.classList.add('ok');
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+    document.getElementById('v-title').textContent = 'Capture verified';
+    document.getElementById('v-detail').textContent = online
+      ? 'Matched to job geofence and synced to dispatch console.'
+      : 'Matched to job geofence. Queued — will sync when signal returns.';
+    document.getElementById('v-dist').textContent = '18m — within 120m radius';
+
+    activeTask.shots.push({verified:true, grad:GRADS[activeTask.shots.length%GRADS.length]});
+    renderTasks();
+
+    const closeBtn = document.getElementById('v-close');
+    closeBtn.textContent = 'Done';
+    closeBtn.className = 'btn primary';
+    closeBtn.style.marginTop = '20px';
+    const newBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newBtn, closeBtn);
+    newBtn.addEventListener('click', closeSheet);
+
+    showToast(online ? 'Synced to dispatch console' : 'Saved offline — will sync automatically');
+  }, 1400);
+}
+
+async function showVerifyLive(timeStr, locStr, loc){
+  document.getElementById('sheet-capture').style.display='none';
+  const v = document.getElementById('sheet-verify');
+  v.style.display='block';
+  v.innerHTML = `
+    <div class="verify-screen">
+      <div class="verify-icon" id="v-icon">
+        <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-linecap="round"><path d="M12 3a9 9 0 100 18"/></svg>
+      </div>
+      <div class="verify-title" id="v-title">Verifying capture…</div>
+      <div class="verify-detail" id="v-detail">Matching timestamp and GPS to job geofence</div>
+      <div style="margin-top:20px;">
+        <div class="verify-row"><span class="l">Captured</span><span class="v">${timeStr}</span></div>
+        <div class="verify-row"><span class="l">Location</span><span class="v">${locStr}</span></div>
+        <div class="verify-row"><span class="l">Job site</span><span class="v">${JOB_SITE.lat.toFixed(4)}°N ${Math.abs(JOB_SITE.lng).toFixed(4)}°W</span></div>
+        <div class="verify-row"><span class="l">Distance from site</span><span class="v" id="v-dist">—</span></div>
+      </div>
+      <button class="btn ghost" id="v-close" style="margin-top:20px;">Retake</button>
+    </div>
+  `;
+  document.getElementById('v-close').addEventListener('click', closeSheet);
+
+  const hash = 'sha256:' + Math.random().toString(16).slice(2) + Date.now();
+  let result;
+  try{
+    const initRes = await fetchJSON(`${API_BASE}/v1/captures/init`, {method:'POST', body:{
+      job_id: JOB_ID, technician_id: TECH_ID, checklist_item_id: activeTask.id,
+      capture_type: captureMode.toLowerCase(),
+      content_hash: hash, capture_lat: loc.lat, capture_lng: loc.lng,
+    }});
+    result = await fetchJSON(`${API_BASE}/v1/captures/${initRes.capture_id}/complete`, {method:'POST', body:{}});
+  }catch(err){
+    document.getElementById('v-icon').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+    document.getElementById('v-title').textContent = 'Could not reach backend';
+    document.getElementById('v-detail').textContent = 'Check that the server is running on :8000, then retake.';
+    return;
+  }
+
+  const icon = document.getElementById('v-icon');
+  const verified = result.status === 'verified';
+  icon.classList.toggle('ok', verified);
+  icon.innerHTML = verified
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.7 17.1a1.6 1.6 0 001.4 2.4h15.8a1.6 1.6 0 001.4-2.4L13.7 3.9a1.6 1.6 0 00-2.8 0z"/></svg>';
+  document.getElementById('v-title').textContent = verified ? 'Capture verified' : 'Flagged for dispatcher review';
+  document.getElementById('v-detail').textContent = verified
+    ? 'Matched to job geofence and synced to dispatch console.'
+    : (result.flag_reason || 'This needs a dispatcher to confirm before it counts toward the job.');
+  const geo = result.checks && result.checks.geofence;
+  document.getElementById('v-dist').textContent = geo
+    ? `${geo.distance_m}m — ${geo.pass ? 'within' : 'outside'} ${geo.radius_m}m radius`
+    : '—';
+
+  activeTask.shots.push({verified, grad: GRADS[activeTask.shots.length % GRADS.length]});
+  renderTasks();
+
+  const closeBtn = document.getElementById('v-close');
+  closeBtn.textContent = 'Done';
+  closeBtn.className = 'btn primary';
+  closeBtn.style.marginTop = '20px';
+  const newBtn = closeBtn.cloneNode(true);
+  closeBtn.parentNode.replaceChild(newBtn, closeBtn);
+  newBtn.addEventListener('click', closeSheet);
+
+  showToast(verified ? 'Verified · synced to dispatch console' : 'Flagged for review — dispatcher notified');
+}
+
+/* ---- submit ---- */
+document.getElementById('submit-btn').addEventListener('click',()=>{
+  if(document.getElementById('submit-btn').disabled) return;
+  document.getElementById('submit-btn').textContent = 'Job closed ✓';
+  showToast(LIVE
+    ? 'Job already closed automatically once every item verified — report generated'
+    : 'Completion report generated — client notified');
+});
+
+/* ---- offline simulation ---- */
+const syncPill = document.getElementById('sync-pill');
+window.addEventListener('online', ()=>{ syncPill.classList.remove('syncing'); document.getElementById('sync-text').textContent='All synced'; });
+window.addEventListener('offline', ()=>{ syncPill.classList.add('syncing'); document.getElementById('sync-text').textContent='Offline — queued'; });
+
+function showToast(text){
+  const t = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+renderTasks();
+loadJobFromAPI();
+</script>
+</body>
+</html>

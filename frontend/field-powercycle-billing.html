@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Billing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;height:100%;overflow:hidden;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  .app{display:grid;grid-template-rows:56px 1fr;height:100vh;width:100vw;}
+
+  .topbar{display:flex;align-items:center;gap:22px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D131A,#0B0F14);}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:2px;font-family:'Inter';}
+  .ticker{display:flex;gap:26px;margin-left:8px;}
+  .tick .v{font-family:'IBM Plex Mono';font-size:14px;font-weight:500;}
+  .tick .v.g{color:var(--green);} .tick .v.a{color:var(--amber);} .tick .v.r{color:var(--red);}
+  .tick .l{font-size:10px;color:var(--text-faint);letter-spacing:.3px;}
+  .conn-badge{display:flex;align-items:center;gap:6px;font-size:10.5px;font-family:'IBM Plex Mono';color:var(--text-faint);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;flex-shrink:0;}
+  .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .conn-badge.live .conn-dot{background:var(--green);box-shadow:0 0 0 2px var(--green-dim);animation:connPulse 1.6s infinite;}
+  .conn-badge.live{color:var(--green);border-color:#245944;}
+  .conn-badge.offline .conn-dot{background:var(--amber);}
+  .conn-badge.offline{color:var(--amber);border-color:#4E3D1D;}
+  @keyframes connPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .body-grid{display:grid;grid-template-rows:auto 1fr;overflow:hidden;}
+  .tabs{display:flex;gap:4px;padding:0 20px;border-bottom:1px solid var(--line);}
+  .tab{padding:13px 6px;font-size:12.5px;font-weight:600;color:var(--text-faint);cursor:pointer;border-bottom:2px solid transparent;font-family:'Space Grotesk';margin-right:22px;}
+  .tab.active{color:var(--text);border-color:var(--blue);}
+  .tab .count{color:var(--text-faint);font-weight:500;margin-left:4px;font-family:'IBM Plex Mono';font-size:11px;}
+
+  .content{overflow-y:auto;padding:22px 26px 60px;}
+  .content::-webkit-scrollbar{width:8px;} .content::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+  .view{display:none;max-width:1040px;}
+  .view.active{display:block;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;}
+  .kpi-label{font-size:11px;color:var(--text-faint);}
+  .kpi-val{font-family:'Space Grotesk';font-size:24px;font-weight:600;margin-top:8px;}
+  .kpi-sub{font-size:11px;color:var(--text-faint);margin-top:3px;}
+
+  .queue-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 18px;margin-bottom:10px;display:flex;align-items:center;gap:16px;}
+  .queue-icon{width:38px;height:38px;border-radius:10px;background:var(--green-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .queue-icon svg{width:17px;stroke:var(--green);}
+  .queue-info{flex:1;min-width:0;}
+  .queue-title{font-size:13.5px;font-weight:600;}
+  .queue-meta{font-size:11.5px;color:var(--text-faint);margin-top:2px;}
+  .queue-amt{font-family:'IBM Plex Mono';font-size:15px;font-weight:500;color:var(--text-dim);text-align:right;flex-shrink:0;}
+  .queue-amt .l{font-size:9.5px;color:var(--text-faint);display:block;text-transform:uppercase;letter-spacing:.2px;margin-top:2px;}
+  .gen-btn{background:var(--blue);color:#06141F;border:none;font-weight:700;font-size:12px;padding:9px 15px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .gen-btn:hover{background:#6EB6F5;}
+  .gen-btn.done{background:var(--panel-2);color:var(--text-faint);border:1px solid var(--line);cursor:default;}
+
+  .inv-table{width:100%;border-collapse:collapse;}
+  .inv-table th{text-align:left;font-size:10px;color:var(--text-faint);font-weight:600;padding:0 12px 10px;border-bottom:1px solid var(--line);letter-spacing:.2px;}
+  .inv-table td{padding:12px;border-bottom:1px solid var(--line-soft);font-size:12.5px;color:var(--text-dim);}
+  .inv-table tr:last-child td{border-bottom:none;}
+  .inv-table tr{cursor:pointer;}
+  .inv-table tr:hover td{background:#12181F;}
+  .inv-id{font-family:'IBM Plex Mono';color:var(--text);font-weight:500;}
+  .status-chip{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+  .status-chip.paid{background:var(--green-dim);color:var(--green);}
+  .status-chip.sent{background:var(--blue-dim);color:var(--blue);}
+  .status-chip.draft{background:var(--panel-2);color:var(--text-faint);border:1px solid var(--line);}
+  .status-chip.overdue{background:var(--red-dim);color:var(--red);}
+  .amt-cell{font-family:'IBM Plex Mono';color:var(--text);}
+
+  .rate-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:12px;}
+  .rate-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .rate-name{font-size:13.5px;font-weight:700;}
+  .rate-tier{font-size:10px;font-family:'IBM Plex Mono';padding:3px 9px;border-radius:20px;}
+  .rate-fields{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .rate-field .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.2px;margin-bottom:4px;}
+  .rate-field .v{font-family:'IBM Plex Mono';font-size:14px;color:var(--text);}
+
+  /* modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(6,9,12,.6);z-index:30;opacity:0;pointer-events:none;transition:.18s;}
+  .modal-backdrop.open{opacity:1;pointer-events:auto;}
+  .modal{position:fixed;top:3%;left:50%;transform:translateX(-50%) translateY(10px);width:640px;max-width:92vw;max-height:94vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;z-index:31;opacity:0;pointer-events:none;transition:.2s;}
+  .modal.open{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0);}
+  .modal-head{padding:20px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);display:flex;justify-content:space-between;align-items:flex-start;}
+  .modal-close{width:28px;height:28px;border-radius:8px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-faint);flex-shrink:0;}
+  .modal-eyebrow{font-family:'IBM Plex Mono';font-size:11px;color:var(--text-faint);}
+  .modal-title{font-family:'Space Grotesk';font-size:18px;font-weight:600;margin-top:4px;}
+  .modal-body{padding:22px 24px 28px;}
+
+  .inv-meta-row{display:flex;gap:28px;margin-bottom:20px;}
+  .inv-meta .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.2px;}
+  .inv-meta .v{font-size:12.5px;font-weight:600;margin-top:4px;}
+
+  .line-table{width:100%;border-collapse:collapse;margin-top:6px;}
+  .line-table th{text-align:left;font-size:10px;color:var(--text-faint);font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--line);}
+  .line-table td{padding:10px;border-bottom:1px solid var(--line-soft);font-size:12px;color:var(--text-dim);}
+  .line-table td.num{text-align:right;font-family:'IBM Plex Mono';color:var(--text);}
+  .line-desc{color:var(--text);font-weight:500;}
+  .line-source{font-size:10px;color:var(--text-faint);margin-top:2px;font-family:'IBM Plex Mono';}
+  .totals-row{display:flex;justify-content:flex-end;margin-top:14px;}
+  .totals-box{width:220px;}
+  .totals-line{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);padding:5px 0;}
+  .totals-line.final{border-top:1px solid var(--line);margin-top:5px;padding-top:9px;font-size:14px;font-weight:700;color:var(--text);}
+
+  .source-note{display:flex;align-items:flex-start;gap:9px;background:var(--green-dim);border:1px solid #245944;border-radius:9px;padding:11px 13px;margin-top:18px;font-size:11.5px;color:var(--green);line-height:1.5;}
+  .source-note svg{width:14px;flex-shrink:0;margin-top:1px;}
+
+  .modal-actions{display:flex;gap:10px;margin-top:20px;}
+  .m-btn{flex:1;padding:11px;border-radius:9px;font-weight:700;font-size:12.5px;text-align:center;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);}
+  .m-btn.primary{background:var(--green);color:#04140E;border-color:var(--green);}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#141C25;border:1px solid var(--green);color:var(--text);padding:11px 18px;border-radius:9px;font-size:12.5px;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:.25s;z-index:40;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast svg{width:15px;height:15px;stroke:var(--green);flex-shrink:0;}
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>Field PowerCycle<span class="sub">— Billing</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a><a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a><a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a><a class="switcher-item" href="field-powercycle-settings.html">Settings</a><div class="switcher-item current">Billing</div><a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a><a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="ticker">
+      <div class="tick"><span class="v" id="stat-outstanding">$18,240</span><span class="l">OUTSTANDING</span></div>
+      <div class="tick"><span class="v g" id="stat-monthly">$64,900</span><span class="l">INVOICED THIS MONTH</span></div>
+      <div class="tick"><span class="v" id="stat-days">14</span><span class="l">AVG DAYS TO PAY</span></div>
+      <div class="tick"><span class="v r" id="stat-overdue">1</span><span class="l">OVERDUE</span></div>
+    </div>
+    <div class="conn-badge" id="conn-badge" style="margin-left:auto;"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting…</span></div>
+  </div>
+
+  <div class="body-grid">
+    <div class="tabs">
+      <div class="tab active" data-v="queue">Invoice queue <span class="count" id="c-queue">(0)</span></div>
+      <div class="tab" data-v="invoices">All invoices <span class="count" id="c-inv">(0)</span></div>
+      <div class="tab" data-v="rates">Rate cards</div>
+    </div>
+
+    <div class="content">
+      <!-- QUEUE -->
+      <div class="view active" id="view-queue">
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-label">Ready to invoice</div><div class="kpi-val" id="kpi-ready">3</div><div class="kpi-sub">verified jobs, not yet billed</div></div>
+          <div class="kpi"><div class="kpi-label">Est. value in queue</div><div class="kpi-val" id="kpi-value">$2,840</div><div class="kpi-sub">auto-calculated from job data</div></div>
+          <div class="kpi"><div class="kpi-label">Avg. time to invoice</div><div class="kpi-val">4h</div><div class="kpi-sub">job close to invoice sent</div></div>
+          <div class="kpi"><div class="kpi-label">Manual line edits</div><div class="kpi-val">3%</div><div class="kpi-sub">of auto-drafted invoices this month</div></div>
+        </div>
+        <div id="queue-list"></div>
+      </div>
+
+      <!-- ALL INVOICES -->
+      <div class="view" id="view-invoices">
+        <table class="inv-table">
+          <thead><tr><th>Invoice</th><th>Client</th><th>Job(s)</th><th>Issued</th><th>Due</th><th>Amount</th><th>Status</th></tr></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- RATE CARDS -->
+      <div class="view" id="view-rates">
+        <div class="rate-card">
+          <div class="rate-head"><span class="rate-name">Standard</span><span class="rate-tier" style="background:var(--green-dim);color:var(--green)">Applies to Standard-tier clients</span></div>
+          <div class="rate-fields">
+            <div class="rate-field"><div class="l">Hourly labor</div><div class="v">$95/hr</div></div>
+            <div class="rate-field"><div class="l">Dispatch fee</div><div class="v">$45</div></div>
+            <div class="rate-field"><div class="l">After-hours multiplier</div><div class="v">1.5×</div></div>
+            <div class="rate-field"><div class="l">Materials markup</div><div class="v">12%</div></div>
+          </div>
+        </div>
+        <div class="rate-card">
+          <div class="rate-head"><span class="rate-name">Priority</span><span class="rate-tier" style="background:var(--amber-dim);color:var(--amber)">Applies to Priority-tier clients</span></div>
+          <div class="rate-fields">
+            <div class="rate-field"><div class="l">Hourly labor</div><div class="v">$115/hr</div></div>
+            <div class="rate-field"><div class="l">Dispatch fee</div><div class="v">$65</div></div>
+            <div class="rate-field"><div class="l">After-hours multiplier</div><div class="v">1.5×</div></div>
+            <div class="rate-field"><div class="l">Materials markup</div><div class="v">12%</div></div>
+          </div>
+        </div>
+        <div class="rate-card">
+          <div class="rate-head"><span class="rate-name">Emergency</span><span class="rate-tier" style="background:var(--red-dim);color:var(--red)">Applies to Emergency-tier clients</span></div>
+          <div class="rate-fields">
+            <div class="rate-field"><div class="l">Hourly labor</div><div class="v">$150/hr</div></div>
+            <div class="rate-field"><div class="l">Dispatch fee</div><div class="v">$95</div></div>
+            <div class="rate-field"><div class="l">After-hours multiplier</div><div class="v">2.0×</div></div>
+            <div class="rate-field"><div class="l">Materials markup</div><div class="v">15%</div></div>
+          </div>
+        </div>
+        <div class="rate-card">
+          <div class="rate-head"><span class="rate-name">Scheduled / Project</span><span class="rate-tier" style="background:var(--panel-2);color:var(--text-faint);border:1px solid var(--line)">Applies to Scheduled-tier clients</span></div>
+          <div class="rate-fields">
+            <div class="rate-field"><div class="l">Hourly labor</div><div class="v">$85/hr</div></div>
+            <div class="rate-field"><div class="l">Dispatch fee</div><div class="v">$0</div></div>
+            <div class="rate-field"><div class="l">After-hours multiplier</div><div class="v">1.5×</div></div>
+            <div class="rate-field"><div class="l">Materials markup</div><div class="v">10%</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop"></div>
+<div class="modal" id="modal">
+  <div class="modal-head">
+    <div>
+      <div class="modal-eyebrow mono" id="m-id">DRAFT</div>
+      <div class="modal-title" id="m-title">—</div>
+    </div>
+    <div class="modal-close" id="modal-close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+  </div>
+  <div class="modal-body" id="modal-body"></div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg><span id="toast-text"></span></div>
+
+<script>
+const MOCK_QUEUE = [
+  { job:'JB-4469', title:'KDS Staging — Full Deployment', client:'Copperline Hospitality', tier:'Standard', rate:95,
+    arrive:'7:31 AM', complete:'8:42 AM', hours:1.2, materials:[['KDS mounting hardware kit',4,38]], generated:false },
+  { job:'JB-4410', title:'Structured Cat6 Run — Back of House', client:'Copperline Hospitality', tier:'Standard', rate:95,
+    arrive:'1:05 PM', complete:'2:15 PM', hours:1.2, materials:[['Cat6 cable (per 100ft)',3,64],['RJ45 termination kit',1,22]], generated:false },
+  { job:'JB-4322', title:'Self-Checkout Kiosk Setup', client:'Copperline Hospitality', tier:'Standard', rate:95,
+    arrive:'9:40 AM', complete:'11:02 AM', hours:1.4, materials:[['Kiosk mounting bracket',4,54]], generated:false },
+];
+
+const MOCK_INVOICES = [
+  { id:'INV-3391', client:'Apex Dining Brands', jobs:'JB-4390, JB-4402', issued:'Aug 18', due:'Sep 17', amount:1240, status:'paid' },
+  { id:'INV-3402', client:'Meridian Health Clinic', jobs:'JB-4415', issued:'Aug 22', due:'Sep 6', amount:3120, status:'overdue' },
+  { id:'INV-3411', client:'RidgeCrest Corporate Center', jobs:'JB-4388', issued:'Aug 25', due:'Sep 24', amount:890, status:'sent' },
+  { id:'INV-3418', client:'Copperline Hospitality', jobs:'JB-4344, JB-4351', issued:'Aug 27', due:'Sep 26', amount:2150, status:'sent' },
+  { id:'INV-3420', client:'Apex Dining Brands', jobs:'JB-4360', issued:'Aug 29', due:'Sep 28', amount:640, status:'draft' },
+];
+
+let QUEUE = MOCK_QUEUE;
+let INVOICES = MOCK_INVOICES;
+
+/* ---------------- Live backend wiring ----------------
+   Paints instantly with the mock data above, then tries to load the real
+   invoice queue and invoice list. Rate-card math mirrors app/billing.py
+   exactly (same numbers shown in the Rate Cards tab) so the queue's
+   estimated total is accurate before an invoice is even generated. */
+const API_BASE = 'http://127.0.0.1:8000';
+let LIVE = false;
+
+const LIVE_RATE_CARDS = {
+  standard:  {hourly: 95,  dispatch: 45, markup: 0.12},
+  priority:  {hourly: 115, dispatch: 65, markup: 0.12},
+  emergency: {hourly: 150, dispatch: 95, markup: 0.15},
+  scheduled: {hourly: 85,  dispatch: 0,  markup: 0.10},
+};
+const TAX_RATE = 0.0825;
+
+function estimateTotal(hours, tierKey){
+  const card = LIVE_RATE_CARDS[tierKey] || LIVE_RATE_CARDS.standard;
+  const subtotal = card.dispatch + hours * card.hourly;
+  return subtotal + subtotal * TAX_RATE;
+}
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString('en-US', {month:'short', day:'numeric'}); }
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function setConnStatus(isLive){
+  const badge = document.getElementById('conn-badge');
+  const text = document.getElementById('conn-text');
+  badge.classList.remove('live','offline');
+  badge.classList.add(isLive ? 'live' : 'offline');
+  text.textContent = isLive ? 'Live · connected to API' : 'Demo data · backend offline';
+}
+
+async function loadQueueAndInvoices(){
+  try{
+    const [queueRes, invRes] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/invoices/queue`),
+      fetchJSON(`${API_BASE}/v1/invoices`),
+    ]);
+    QUEUE = queueRes.map(q => ({
+      job: q.job_id, title: q.job_type, client: q.client,
+      tierKey: q.sla_tier, tier: capitalize(q.sla_tier),
+      hours: q.hours, generated: false, live: true,
+    }));
+    INVOICES = invRes.map(inv => ({
+      id: inv.invoice_id, client: inv.client, jobs: inv.job_id,
+      issued: fmtDate(inv.issued_at), due: inv.due_at ? fmtDate(inv.due_at) : 'Net 30',
+      amount: inv.total, status: inv.status,
+    }));
+    LIVE = true;
+    setConnStatus(true);
+    renderQueue();
+    renderInvoices();
+  }catch(err){
+    if(!LIVE){ QUEUE = MOCK_QUEUE; INVOICES = MOCK_INVOICES; }
+    setConnStatus(false);
+  }
+}
+
+async function generateLiveInvoice(q){
+  try{
+    const res = await fetchJSON(`${API_BASE}/v1/invoices/generate/${q.job}`, {method:'POST', body:{materials:[]}});
+    q.generated = true;
+    renderQueue();
+    openLiveInvoiceModal(res, q);
+    const invRes = await fetchJSON(`${API_BASE}/v1/invoices`);
+    INVOICES = invRes.map(inv => ({
+      id: inv.invoice_id, client: inv.client, jobs: inv.job_id,
+      issued: fmtDate(inv.issued_at), due: inv.due_at ? fmtDate(inv.due_at) : 'Net 30',
+      amount: inv.total, status: inv.status,
+    }));
+    renderInvoices();
+  }catch(err){
+    showToast('Could not reach backend — is it running on :8000?');
+  }
+}
+
+function openLiveInvoiceModal(res, q){
+  document.getElementById('m-id').textContent = res.status.toUpperCase() + ' · ' + res.job_id;
+  document.getElementById('m-title').textContent = 'Auto-drafted invoice';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="inv-meta-row">
+      <div class="inv-meta"><div class="l">Client</div><div class="v">${res.client}</div></div>
+      <div class="inv-meta"><div class="l">Hours logged</div><div class="v">${res.hours}hrs</div></div>
+      <div class="inv-meta"><div class="l">Rate tier</div><div class="v">${capitalize(res.tier)}</div></div>
+    </div>
+    <table class="line-table">
+      <thead><tr><th>Line item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        ${res.line_items.map(li => `
+        <tr>
+          <td><div class="line-desc">${li.description}</div><div class="line-source">${li.source}</div></td>
+          <td class="num">${li.qty != null ? li.qty : '—'}</td>
+          <td class="num">${li.rate != null ? '$'+li.rate.toFixed(2) : '—'}</td>
+          <td class="num">$${li.amount.toFixed(2)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="totals-row"><div class="totals-box">
+      <div class="totals-line"><span>Subtotal</span><span class="mono">$${res.subtotal.toFixed(2)}</span></div>
+      <div class="totals-line"><span>Tax (8.25%)</span><span class="mono">$${res.tax.toFixed(2)}</span></div>
+      <div class="totals-line final"><span>Total</span><span class="mono">$${res.total.toFixed(2)}</span></div>
+    </div></div>
+    <div class="source-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+      Generated by the real billing engine — every number above came from ${res.job_id}'s actual arrival/completion timestamps and rate card, computed server-side, not typed in here. No materials were attached to this draft; the invoice can still be sent as-is.
+    </div>
+    <div class="modal-actions">
+      <button class="m-btn primary" id="send-btn" style="flex:1;">Approve &amp; send to ${res.client.split(' ')[0]}</button>
+    </div>
+  `;
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.getElementById('send-btn').addEventListener('click', async ()=>{
+    try{
+      await fetchJSON(`${API_BASE}/v1/invoices/${res.invoice_id}/send`, {method:'POST', body:{}});
+      closeModal();
+      await loadQueueAndInvoices();
+      showToast(`Invoice sent to ${res.client} — $${res.total.toFixed(2)}`);
+    }catch(err){
+      showToast('Could not reach backend to send this invoice');
+    }
+  });
+}
+
+function calcInvoice(q){
+  const dispatchFee = 45;
+  const labor = q.hours * q.rate;
+  const matSubtotal = q.materials.reduce((s,m)=>s+m[1]*m[2],0);
+  const matMarkup = matSubtotal * 0.12;
+  const subtotal = dispatchFee + labor + matSubtotal + matMarkup;
+  const tax = subtotal * 0.0825;
+  const total = subtotal + tax;
+  return {dispatchFee, labor, matSubtotal, matMarkup, subtotal, tax, total};
+}
+
+function renderQueue(){
+  document.getElementById('queue-list').innerHTML = QUEUE.map((q,i)=>{
+    const total = q.live ? estimateTotal(q.hours, q.tierKey) : calcInvoice(q).total;
+    const meta = q.live ? `${q.client} · ${q.hours}hrs logged` : `${q.client} · Verified ${q.complete} · ${q.hours}hrs logged`;
+    return `
+    <div class="queue-card">
+      <div class="queue-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg></div>
+      <div class="queue-info">
+        <div class="queue-title">${q.title} <span class="mono" style="color:var(--text-faint);font-weight:400;font-size:11px;">${q.job}</span></div>
+        <div class="queue-meta">${meta}</div>
+      </div>
+      <div class="queue-amt">$${total.toFixed(2)}<span class="l">Est. total</span></div>
+      <button class="gen-btn ${q.generated?'done':''}" data-i="${i}">${q.generated?'Draft created ✓':'Generate invoice'}</button>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.gen-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const q = QUEUE[btn.dataset.i];
+      if(q.generated) return;
+      if(q.live) generateLiveInvoice(q);
+      else openDraftModal(q);
+    });
+  });
+  document.getElementById('c-queue').textContent = `(${QUEUE.filter(q=>!q.generated).length})`;
+  document.getElementById('kpi-ready').textContent = QUEUE.filter(q=>!q.generated).length;
+  const totalVal = QUEUE.reduce((s,q)=> s + (q.live ? estimateTotal(q.hours,q.tierKey) : calcInvoice(q).total), 0);
+  document.getElementById('kpi-value').textContent = '$'+totalVal.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+
+function openDraftModal(q){
+  const calc = calcInvoice(q);
+  document.getElementById('m-id').textContent = 'DRAFT · ' + q.job;
+  document.getElementById('m-title').textContent = 'Auto-drafted invoice';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="inv-meta-row">
+      <div class="inv-meta"><div class="l">Client</div><div class="v">${q.client}</div></div>
+      <div class="inv-meta"><div class="l">Site visit</div><div class="v">${q.arrive} – ${q.complete}</div></div>
+      <div class="inv-meta"><div class="l">Rate tier</div><div class="v">${q.tier}</div></div>
+    </div>
+    <table class="line-table">
+      <thead><tr><th>Line item</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><div class="line-desc">Dispatch fee</div><div class="line-source">flat · ${q.tier} tier</div></td>
+          <td class="num">1</td><td class="num">$${calc.dispatchFee.toFixed(2)}</td><td class="num">$${calc.dispatchFee.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td><div class="line-desc">Field labor</div><div class="line-source">from audit trail: arrival → completion timestamps</div></td>
+          <td class="num">${q.hours}hrs</td><td class="num">$${q.rate}/hr</td><td class="num">$${calc.labor.toFixed(2)}</td>
+        </tr>
+        ${q.materials.map(m=>`
+        <tr>
+          <td><div class="line-desc">${m[0]}</div><div class="line-source">materials — logged on job</div></td>
+          <td class="num">${m[1]}</td><td class="num">$${m[2].toFixed(2)}</td><td class="num">$${(m[1]*m[2]).toFixed(2)}</td>
+        </tr>`).join('')}
+        <tr>
+          <td><div class="line-desc">Materials markup</div><div class="line-source">12% per rate card</div></td>
+          <td class="num">—</td><td class="num">—</td><td class="num">$${calc.matMarkup.toFixed(2)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="totals-row"><div class="totals-box">
+      <div class="totals-line"><span>Subtotal</span><span class="mono">$${calc.subtotal.toFixed(2)}</span></div>
+      <div class="totals-line"><span>Tax (8.25%)</span><span class="mono">$${calc.tax.toFixed(2)}</span></div>
+      <div class="totals-line final"><span>Total</span><span class="mono">$${calc.total.toFixed(2)}</span></div>
+    </div></div>
+    <div class="source-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+      Every line above traces to a verified capture or a timestamped audit event on ${q.job} — labor hours weren't estimated or self-reported, they're the gap between the technician's geofence-entry and job-close timestamps.
+    </div>
+    <div class="modal-actions">
+      <button class="m-btn" id="edit-btn">Edit line items</button>
+      <button class="m-btn primary" id="send-btn">Approve &amp; send to ${q.client.split(' ')[0]}</button>
+    </div>
+  `;
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('modal-backdrop').classList.add('open');
+  document.getElementById('send-btn').addEventListener('click', ()=>{
+    q.generated = true;
+    INVOICES.unshift({id:'INV-34'+Math.floor(20+Math.random()*70), client:q.client, jobs:q.job, issued:'Today', due:'Net 30', amount:Math.round(calc.total), status:'sent'});
+    closeModal();
+    renderQueue();
+    renderInvoices();
+    showToast(`Invoice sent to ${q.client} — $${calc.total.toFixed(2)}`);
+  });
+  document.getElementById('edit-btn').addEventListener('click', ()=>{
+    showToast('Line items unlocked for manual edit');
+  });
+}
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('modal-backdrop').classList.remove('open');
+}
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+
+function renderInvoices(){
+  document.getElementById('inv-tbody').innerHTML = INVOICES.map(inv=>`
+    <tr>
+      <td class="inv-id">${inv.id}</td>
+      <td>${inv.client}</td>
+      <td class="mono" style="font-size:11px;">${inv.jobs}</td>
+      <td>${inv.issued}</td>
+      <td>${inv.due}</td>
+      <td class="amt-cell">$${inv.amount.toLocaleString()}</td>
+      <td><span class="status-chip ${inv.status}">${inv.status}</span></td>
+    </tr>
+  `).join('');
+  document.getElementById('c-inv').textContent = `(${INVOICES.length})`;
+}
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-'+tab.dataset.v).classList.add('active');
+  });
+});
+
+function showToast(text){
+  const t = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = text;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+renderQueue();
+renderInvoices();
+loadQueueAndInvoices();
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

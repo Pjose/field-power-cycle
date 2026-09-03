@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Live Dispatch Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14;
+    --panel:#111820;
+    --panel-2:#141C25;
+    --line:#232E3A;
+    --line-soft:#1A232D;
+    --text:#E7EDF3;
+    --text-dim:#8CA0B3;
+    --text-faint:#5C6C7C;
+    --green:#3ED9A0;
+    --green-dim:#1D4E42;
+    --amber:#F0AC4E;
+    --amber-dim:#4E3D1D;
+    --blue:#5AA9F2;
+    --blue-dim:#1D3A4E;
+    --red:#E86A6A;
+    --red-dim:#4E1D1D;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;height:100%;overflow:hidden;}
+  ::selection{background:var(--blue);color:#04141F;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+
+  .app{display:grid;grid-template-columns:64px 1fr;grid-template-rows:56px 1fr;height:100vh;width:100vw;}
+
+  /* ---- Topbar ---- */
+  .topbar{grid-column:1/3;grid-row:1;display:flex;align-items:center;gap:28px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D131A,#0B0F14);}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:.2px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:2px;}
+  .ticker{display:flex;gap:26px;margin-left:8px;}
+  .tick{display:flex;flex-direction:column;gap:1px;}
+  .tick .v{font-family:'IBM Plex Mono';font-size:14px;font-weight:500;color:var(--text);}
+  .tick .l{font-size:10px;color:var(--text-faint);letter-spacing:.3px;}
+  .tick .v.g{color:var(--green);} .tick .v.a{color:var(--amber);} .tick .v.r{color:var(--red);}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:14px;}
+  .clock{font-family:'IBM Plex Mono';font-size:12.5px;color:var(--text-dim);}
+  .conn-badge{display:flex;align-items:center;gap:6px;font-size:10.5px;font-family:'IBM Plex Mono';color:var(--text-faint);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;}
+  .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .conn-badge.live .conn-dot{background:var(--green);box-shadow:0 0 0 2px var(--green-dim);animation:connPulse 1.6s infinite;}
+  .conn-badge.live{color:var(--green);border-color:#245944;}
+  .conn-badge.offline .conn-dot{background:var(--amber);}
+  .conn-badge.offline{color:var(--amber);border-color:#4E3D1D;}
+  @keyframes connPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .avatar{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#2C4A5E,#17222C);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--blue);border:1px solid var(--line);}
+
+  /* ---- Sidebar ---- */
+  .sidebar{grid-column:1;grid-row:2;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;background:#0C1116;}
+  .nav-btn{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer;border:1px solid transparent;transition:.15s;}
+  .nav-btn svg{width:19px;height:19px;}
+  .nav-btn:hover{color:var(--text-dim);background:#161F29;}
+  .nav-btn.active{color:var(--blue);background:var(--blue-dim);border-color:#2A4A63;}
+
+  /* ---- Main grid ---- */
+  .main{grid-column:2;grid-row:2;display:grid;grid-template-columns:1.55fr 400px;grid-template-rows:1fr;overflow:hidden;}
+
+  /* ---- Map panel ---- */
+  .map-wrap{position:relative;border-right:1px solid var(--line);overflow:hidden;background:#0A0E13;}
+  .map-header{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;pointer-events:none;}
+  .map-title{font-family:'Space Grotesk';font-weight:600;font-size:14px;}
+  .map-title span{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:6px;font-family:'Inter';}
+  .legend{display:flex;gap:14px;pointer-events:auto;background:rgba(17,24,32,.85);backdrop-filter:blur(6px);padding:7px 12px;border-radius:8px;border:1px solid var(--line);}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);}
+  .legend-dot{width:7px;height:7px;border-radius:50%;}
+  svg.map{width:100%;height:100%;display:block;}
+  .tech-pin{cursor:pointer;}
+  .tech-pin .ring{opacity:.35;}
+  .tech-pin .label{font-family:'IBM Plex Mono';font-size:9px;fill:var(--text-dim);pointer-events:none;}
+  .tech-pin.selected .halo{opacity:1;}
+  .site-marker{cursor:pointer;}
+  .site-marker rect{transition:.15s;}
+  .site-marker:hover rect{stroke:var(--text-dim);}
+
+  .map-footer{position:absolute;bottom:14px;left:18px;z-index:5;background:rgba(17,24,32,.85);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-family:'IBM Plex Mono';font-size:10.5px;color:var(--text-faint);max-width:260px;line-height:1.6;}
+
+  /* ---- Right column: tabs + list ---- */
+  .right-col{display:flex;flex-direction:column;overflow:hidden;}
+  .tabs{display:flex;border-bottom:1px solid var(--line);padding:0 14px;gap:4px;flex-shrink:0;}
+  .tab{padding:13px 10px;font-size:12.5px;font-weight:600;color:var(--text-faint);cursor:pointer;border-bottom:2px solid transparent;font-family:'Space Grotesk';}
+  .tab.active{color:var(--text);border-color:var(--blue);}
+  .tab .count{color:var(--text-faint);font-weight:500;margin-left:4px;font-family:'IBM Plex Mono';font-size:11px;}
+
+  .list{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .list::-webkit-scrollbar{width:8px;} .list::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+
+  .job-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 13px;cursor:pointer;transition:.12s;}
+  .job-card:hover{border-color:#33455A;background:var(--panel-2);}
+  .job-card.selected{border-color:var(--blue);background:#12202C;}
+  .job-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .job-id{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--text-faint);}
+  .job-site{font-size:13.5px;font-weight:600;margin-top:3px;}
+  .job-type{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+  .pill{font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap;letter-spacing:.2px;}
+  .pill.enroute{background:var(--blue-dim);color:var(--blue);}
+  .pill.onsite{background:var(--green-dim);color:var(--green);}
+  .pill.done{background:#1B2530;color:var(--text-dim);}
+  .pill.risk{background:var(--red-dim);color:var(--red);}
+  .pill.queued{background:var(--amber-dim);color:var(--amber);}
+  .job-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+  .job-tech{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);}
+  .job-tech .dot{width:6px;height:6px;border-radius:50%;}
+  .job-sla{font-family:'IBM Plex Mono';font-size:11px;}
+  .job-sla.ok{color:var(--text-faint);} .job-sla.warn{color:var(--amber);} .job-sla.bad{color:var(--red);}
+
+  /* ---- Detail drawer ---- */
+  .drawer-backdrop{position:fixed;inset:0;background:rgba(6,9,12,.55);z-index:20;opacity:0;pointer-events:none;transition:.18s;}
+  .drawer-backdrop.open{opacity:1;pointer-events:auto;}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);z-index:21;transform:translateX(100%);transition:.22s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+  .drawer.open{transform:translateX(0);}
+  .drawer-head{padding:18px 20px 14px;border-bottom:1px solid var(--line);flex-shrink:0;}
+  .drawer-head-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .drawer-close{cursor:pointer;color:var(--text-faint);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;}
+  .drawer-close:hover{background:#1A232D;color:var(--text);}
+  .drawer-site{font-family:'Space Grotesk';font-size:18px;font-weight:600;margin-top:2px;}
+  .drawer-sub{color:var(--text-dim);font-size:12.5px;margin-top:4px;}
+  .drawer-stats{display:flex;gap:18px;margin-top:14px;}
+  .dstat .v{font-family:'IBM Plex Mono';font-size:13px;font-weight:500;}
+  .dstat .l{font-size:10px;color:var(--text-faint);margin-top:2px;}
+
+  .drawer-body{flex:1;overflow-y:auto;padding:18px 20px 40px;}
+  .drawer-body::-webkit-scrollbar{width:8px;} .drawer-body::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+
+  .section-title{font-family:'Space Grotesk';font-size:12.5px;font-weight:600;color:var(--text-dim);text-transform:none;margin:22px 0 12px;display:flex;align-items:center;justify-content:space-between;}
+  .section-title:first-child{margin-top:0;}
+
+  .checklist{display:flex;flex-direction:column;gap:9px;}
+  .check-item{display:flex;align-items:center;gap:10px;font-size:12.5px;}
+  .check-box{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .check-box.done{background:var(--green);border-color:var(--green);}
+  .check-box.done svg{width:10px;height:10px;stroke:#04140E;}
+  .check-item.done span{color:var(--text-dim);}
+  .check-item.pending span{color:var(--text-faint);}
+  .auto-tag{margin-left:auto;font-family:'IBM Plex Mono';font-size:9.5px;color:var(--green);background:var(--green-dim);padding:2px 6px;border-radius:5px;}
+
+  .proof-item{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px;background:#0D131A;}
+  .proof-media{height:120px;position:relative;overflow:hidden;}
+  .proof-overlay{position:absolute;bottom:0;left:0;right:0;padding:7px 9px;background:linear-gradient(0deg,rgba(0,0,0,.75),transparent);font-family:'IBM Plex Mono';font-size:9.5px;color:#D7E3EE;line-height:1.5;}
+  .proof-badge{position:absolute;top:8px;right:8px;background:rgba(6,10,14,.7);border:1px solid var(--green);color:var(--green);font-size:9px;font-family:'IBM Plex Mono';padding:3px 7px;border-radius:20px;display:flex;align-items:center;gap:4px;}
+  .proof-badge.verifying{border-color:var(--amber);color:var(--amber);}
+  .proof-badge svg{width:9px;height:9px;}
+  .proof-meta{padding:9px 11px;display:flex;justify-content:space-between;align-items:center;}
+  .proof-cap{font-size:11.5px;color:var(--text-dim);}
+  .proof-type{font-size:9.5px;color:var(--text-faint);font-family:'IBM Plex Mono';}
+
+  .btn{border:1px solid var(--line);background:#161F29;color:var(--text);font-family:'Inter';font-weight:600;font-size:12.5px;padding:10px 14px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:.12s;}
+  .btn:hover{background:#1C2732;border-color:#33455A;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#06141F;}
+  .btn.primary:hover{background:#6EB6F5;}
+  .btn.full{width:100%;}
+  .btn svg{width:14px;height:14px;}
+
+  .timeline{border-left:1px solid var(--line);margin-left:6px;padding-left:16px;display:flex;flex-direction:column;gap:14px;}
+  .tl-item{position:relative;font-size:12px;}
+  .tl-item::before{content:'';position:absolute;left:-20.5px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--line-soft);border:2px solid var(--text-faint);}
+  .tl-item.active::before{background:var(--green);border-color:var(--green);}
+  .tl-time{font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);}
+  .tl-label{color:var(--text-dim);margin-top:1px;}
+
+  /* Technician list (secondary tab) */
+  .tech-row{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;cursor:pointer;}
+  .tech-row:hover{border-color:#33455A;}
+  .tech-av{width:34px;height:34px;border-radius:9px;background:#1A2530;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;color:var(--text-dim);flex-shrink:0;font-family:'Space Grotesk';}
+  .tech-info{flex:1;min-width:0;}
+  .tech-name{font-size:13px;font-weight:600;}
+  .tech-status{font-size:11px;color:var(--text-dim);margin-top:2px;display:flex;align-items:center;gap:5px;}
+  .tech-status .dot{width:6px;height:6px;border-radius:50%;}
+  .tech-gps{font-family:'IBM Plex Mono';font-size:9.5px;color:var(--text-faint);text-align:right;flex-shrink:0;}
+
+  /* Review queue */
+  .review-card{background:var(--panel);border:1px solid var(--red-dim);border-left:3px solid var(--red);border-radius:10px;padding:12px 13px;}
+  .review-card.resolved{border-left-color:var(--line);border-color:var(--line);opacity:.5;}
+  .review-top{display:flex;gap:10px;}
+  .review-thumb{width:52px;height:52px;border-radius:8px;flex-shrink:0;border:1px solid var(--line);}
+  .review-info{flex:1;min-width:0;}
+  .review-job{font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);}
+  .review-site{font-size:13px;font-weight:600;margin-top:2px;}
+  .review-tech{font-size:11px;color:var(--text-dim);margin-top:1px;}
+  .review-reason{display:flex;align-items:flex-start;gap:7px;margin-top:10px;background:var(--red-dim);border:1px solid #4E2626;border-radius:8px;padding:8px 10px;font-size:11.5px;color:#F2B8B8;line-height:1.5;}
+  .review-reason svg{width:13px;height:13px;flex-shrink:0;margin-top:1.5px;stroke:var(--red);}
+  .review-actions{display:flex;gap:8px;margin-top:10px;}
+  .review-actions .btn{padding:8px 12px;font-size:11.5px;}
+  .btn.approve{background:var(--green-dim);border-color:#245944;color:var(--green);}
+  .btn.approve:hover{background:#1F5B4C;}
+  .btn.reject{background:var(--red-dim);border-color:#4E2626;color:var(--red);}
+  .btn.reject:hover{background:#5C2A2A;}
+  .review-resolved-tag{font-size:11px;color:var(--text-faint);margin-top:8px;display:flex;align-items:center;gap:6px;}
+  .review-empty{text-align:center;padding:40px 20px;color:var(--text-faint);font-size:12.5px;line-height:1.6;}
+  .review-empty svg{width:30px;height:30px;stroke:var(--text-faint);margin-bottom:10px;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#141C25;border:1px solid var(--green);color:var(--text);padding:11px 18px;border-radius:9px;font-size:12.5px;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:.25s;z-index:40;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast svg{width:15px;height:15px;stroke:var(--green);flex-shrink:0;}
+
+  @media (max-width:900px){
+    .main{grid-template-columns:1fr;grid-template-rows:1fr 1fr;}
+    .map-wrap{border-right:none;border-bottom:1px solid var(--line);}
+    .ticker{display:none;}
+  }
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>Field PowerCycle<span class="sub">— Dispatch Console</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <div class="switcher-item current">Dispatch Console</div><a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a><a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a><a class="switcher-item" href="field-powercycle-settings.html">Settings</a><a class="switcher-item" href="field-powercycle-billing.html">Billing</a><a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a><a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="ticker">
+      <div class="tick"><span class="v g" id="stat-active">7</span><span class="l">TECHS ACTIVE</span></div>
+      <div class="tick"><span class="v" id="stat-jobs">12</span><span class="l">JOBS TODAY</span></div>
+      <div class="tick"><span class="v a" id="stat-risk">2</span><span class="l">SLA AT RISK</span></div>
+      <div class="tick"><span class="v" id="stat-verified">38</span><span class="l">PROOFS VERIFIED</span></div>
+      <div class="tick"><span class="v r" id="stat-flagged">3</span><span class="l">NEEDS REVIEW</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="clock mono" id="clock">--:--:--</div>
+      <div class="conn-badge" id="conn-badge" title="Backend connection status">
+        <span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting…</span>
+      </div>
+      <div class="avatar">DV</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="nav-btn active" title="Dispatch Map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg></div>
+    <div class="nav-btn" title="Job Queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+    <div class="nav-btn" title="Review Queue" id="nav-review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3.2"/></svg></div>
+    <div class="nav-btn" title="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V10M12 20V4M20 20v-7"/></svg></div>
+  </div>
+
+  <div class="main">
+    <!-- MAP -->
+    <div class="map-wrap">
+      <div class="map-header">
+        <div class="map-title">Live Field Map <span id="map-sub">Dallas–Fort Worth corridor</span></div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>On site</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>En route</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--text-faint)"></span>Idle</div>
+        </div>
+      </div>
+      <svg class="map" id="map-svg" viewBox="0 0 800 620"></svg>
+      <div class="map-footer">GPS pings every 15s · geofence radius 120m<br>Positions simulated for this preview</div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-col">
+      <div class="tabs">
+        <div class="tab active" data-tab="jobs">Job Queue <span class="count" id="jobs-count">(0)</span></div>
+        <div class="tab" data-tab="techs">Technicians <span class="count" id="techs-count">(0)</span></div>
+        <div class="tab" data-tab="review">Review <span class="count" id="review-count">(0)</span></div>
+      </div>
+      <div class="list" id="jobs-list"></div>
+      <div class="list" id="techs-list" style="display:none;"></div>
+      <div class="list" id="review-list" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="backdrop"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="drawer-head-top">
+      <div>
+        <div class="job-id mono" id="d-id">TICKET</div>
+        <div class="drawer-site" id="d-site">—</div>
+        <div class="drawer-sub" id="d-sub">—</div>
+      </div>
+      <div class="drawer-close" id="d-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </div>
+    </div>
+    <div class="drawer-stats">
+      <div class="dstat"><div class="v" id="d-tech">—</div><div class="l">TECHNICIAN</div></div>
+      <div class="dstat"><div class="v mono" id="d-sla">—</div><div class="l">SLA WINDOW</div></div>
+      <div class="dstat"><div class="v mono" id="d-status">—</div><div class="l">STATUS</div></div>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div class="section-title">Completion checklist</div>
+    <div class="checklist" id="d-checklist"></div>
+
+    <div class="section-title">Proof of work <span class="auto-tag" style="margin-left:8px;">AUTO-VERIFIED</span></div>
+    <div id="d-proofs"></div>
+    <button class="btn full" id="d-capture" style="margin-top:4px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8a2 2 0 012-2h1.5l1-1.5h7l1 1.5H18a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z"/><circle cx="12" cy="13" r="3.2"/></svg>
+      Simulate technician capture
+    </button>
+
+    <div class="section-title">Dispatch timeline</div>
+    <div class="timeline" id="d-timeline"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+  <span id="toast-text">Proof verified</span>
+</div>
+
+<script>
+/* ---------------- Data model ---------------- */
+const SITES = [
+  {x:180,y:130},{x:340,y:90},{x:520,y:150},{x:610,y:260},{x:260,y:300},
+  {x:420,y:340},{x:150,y:420},{x:560,y:440},{x:680,y:130},{x:320,y:500}
+];
+
+const MOCK_TECHS = [
+  {id:'T-104', name:'Marcus Reyes', init:'MR', status:'onsite', color:'green'},
+  {id:'T-092', name:'Priya Chandran', init:'PC', status:'enroute', color:'blue'},
+  {id:'T-118', name:'Dana Whitfield', init:'DW', status:'onsite', color:'green'},
+  {id:'T-071', name:'Sam Okafor', init:'SO', status:'idle', color:'faint'},
+  {id:'T-133', name:'Luis Fontana', init:'LF', status:'enroute', color:'blue'},
+  {id:'T-059', name:'Grace Halden', init:'GH', status:'onsite', color:'green'},
+  {id:'T-201', name:'Ivy Torres', init:'IT', status:'enroute', color:'blue'},
+];
+
+const JOB_TYPES = ['POS Terminal Install','Structured Cat6 Run','Break-Fix — Router','KDS Staging','Firewall Swap','Self-Checkout Kiosk Setup','Break-Fix — Payment Terminal','MDF Rack Cabling'];
+const CLIENTS = ['Targeted Merchant Group #14','Apex Dining Brands — Uptown','Meridian Health Clinic','Fairview Retail Park','Copperline Hospitality','RidgeCrest Corporate Center','Union Square Retail #7','Bellhaven Medical Plaza'];
+
+let jobs = [];
+let flagged = [];
+
+const MOCK_JOBS = [
+  {id:'JB-4471', site:CLIENTS[0], type:JOB_TYPES[0], tech:'T-104', status:'onsite', slaMins:34, pos:SITES[0],
+    checklist:[['Terminal mounted & powered',true],['Network drop tested',true],['Payment device paired',false],['Staff walkthrough complete',false]],
+    proofs:[
+      {cap:'Terminal mounted, power verified', time:'10:12:04 AM', tag:'PHOTO', verified:true},
+      {cap:'Cat6 termination — link light green', time:'10:19:41 AM', tag:'PHOTO', verified:true},
+    ],
+    tl:[['9:41 AM','Ticket assigned to Marcus Reyes',true],['9:58 AM','En route — ETA 12 min',true],['10:07 AM','Arrived on site, geofence confirmed',true],['—','Awaiting completion proof',false]]},
+  {id:'JB-4472', site:CLIENTS[1], type:JOB_TYPES[6], tech:'T-092', status:'enroute', slaMins:12, pos:SITES[1],
+    checklist:[['Diagnostic run',false],['Replacement unit installed',false],['Transaction test passed',false]],
+    proofs:[], tl:[['10:31 AM','Emergency ticket created — SLA 2hr',true],['10:34 AM','Assigned to Priya Chandran',true],['10:36 AM','En route — ETA 12 min',true]]},
+  {id:'JB-4468', site:CLIENTS[2], type:JOB_TYPES[7], tech:'T-118', status:'onsite', slaMins:118, pos:SITES[2],
+    checklist:[['Rack layout confirmed',true],['Fiber runs labeled',true],['Switch config loaded',true],['Redundant power tested',false]],
+    proofs:[
+      {cap:'MDF rack — before state', time:'8:02:11 AM', tag:'PHOTO', verified:true},
+      {cap:'Cable management pass 1', time:'9:14:55 AM', tag:'VIDEO', verified:true},
+      {cap:'Switch config screen', time:'9:47:20 AM', tag:'PHOTO', verified:true},
+    ],
+    tl:[['7:50 AM','Arrived on site',true],['8:00 AM','Clean-room protocol logged',true],['9:45 AM','Config verified against spec',true],['—','Final power test pending',false]]},
+  {id:'JB-4475', site:CLIENTS[3], type:JOB_TYPES[4], tech:null, status:'queued', slaMins:206, pos:SITES[3],
+    checklist:[['Firewall staged',false],['Swap scheduled window confirmed',false]],
+    proofs:[], tl:[['11:02 AM','Ticket created',true],['—','Awaiting technician assignment',false]]},
+  {id:'JB-4469', site:CLIENTS[4], type:JOB_TYPES[3], tech:'T-059', status:'done', slaMins:-9, pos:SITES[4],
+    checklist:[['KDS mounted',true],['Kitchen Wi-Fi validated',true],['Staff training complete',true]],
+    proofs:[
+      {cap:'KDS screens mounted, all 4 stations', time:'7:55:02 AM', tag:'PHOTO', verified:true},
+      {cap:'Wi-Fi survey walkthrough', time:'8:20:47 AM', tag:'VIDEO', verified:true},
+      {cap:'Manager sign-off on tablet', time:'8:41:19 AM', tag:'PHOTO', verified:true},
+    ],
+    tl:[['7:30 AM','Arrived on site',true],['8:40 AM','Checklist auto-completed from proof',true],['8:42 AM','Job closed — no paperwork required',true]]},
+  {id:'JB-4477', site:CLIENTS[5], type:JOB_TYPES[1], tech:'T-133', status:'enroute', slaMins:45, pos:SITES[5],
+    checklist:[['Cable path surveyed',false],['Cat6 pulled',false],['Termination tested',false]],
+    proofs:[], tl:[['10:50 AM','Assigned to Luis Fontana',true],['10:55 AM','En route — ETA 22 min',true]]},
+  {id:'JB-4478', site:CLIENTS[6], type:JOB_TYPES[5], tech:null, status:'risk', slaMins:-4, pos:SITES[6],
+    checklist:[['Kiosk unboxed',false],['Payment terminal linked',false]],
+    proofs:[], tl:[['9:10 AM','Ticket created — SLA breach imminent',true],['—','Unassigned',false]]},
+  {id:'JB-4479', site:CLIENTS[7], type:JOB_TYPES[0], tech:'T-201', status:'enroute', slaMins:60, pos:SITES[7],
+    checklist:[['Terminal mounted',false],['Network drop tested',false]],
+    proofs:[], tl:[['10:20 AM','Assigned to Ivy Torres',true],['10:24 AM','En route — ETA 18 min',true]]},
+];
+
+const MOCK_FLAGGED = [
+  {id:'FLG-201', jobId:'JB-4471', site:CLIENTS[0], tech:'Marcus Reyes', reason:'Capture GPS 340m outside the job geofence — nearest match is the parking structure across the street.', time:'10:24:12 AM', grad:'linear-gradient(135deg,#4E1D1D,#1F0D0D)', resolved:null},
+  {id:'FLG-202', jobId:'JB-4468', site:CLIENTS[2], tech:'Dana Whitfield', reason:'Content hash matches a photo already attached to ticket JB-4201, closed 11 days ago — possible resubmission.', time:'9:51:38 AM', grad:'linear-gradient(135deg,#4E3D1D,#241C0D)', resolved:null},
+  {id:'FLG-203', jobId:'JB-4469', site:CLIENTS[4], tech:'Grace Halden', reason:'Capture timestamp is 6 minutes before dispatch was recorded as en route — device clock may be out of sync.', time:'7:24:05 AM', grad:'linear-gradient(135deg,#1D2A4E,#0D1220)', resolved:null},
+];
+
+/* ---------------- Live API wiring ----------------
+   Everything above is fallback demo data. Below: an attempt to load the
+   SAME shapes from the real backend (field-powercycle-backend). If it's
+   reachable, jobs/TECHS/flagged get replaced with live data computed from
+   a real database — real geofence distances, real audit trails, real
+   checklist state. If it's not running, the demo data above just keeps
+   working standalone. */
+
+const API_BASE = 'http://127.0.0.1:8000';
+let LIVE = false;
+let TECHS = MOCK_TECHS;
+
+const MAP_BOUNDS = {latMin:32.755, latMax:32.885, lngMin:-96.955, lngMax:-96.775};
+function projectLatLng(lat, lng){
+  const margin = 70;
+  const x = margin + (lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin) * (800 - 2*margin);
+  const y = margin + (1 - (lat - MAP_BOUNDS.latMin) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * (620 - 2*margin);
+  return {x, y};
+}
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok){ throw new Error(`HTTP ${res.status}`); }
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function setConnBadge(isLive){
+  const badge = document.getElementById('conn-badge');
+  const text = document.getElementById('conn-text');
+  badge.classList.remove('live','offline');
+  badge.classList.add(isLive ? 'live' : 'offline');
+  text.textContent = isLive ? 'Live · connected to API' : 'Demo data · backend offline';
+}
+
+function apiJobToLocal(aj){
+  return {
+    id: aj.id,
+    site: aj.site.name,
+    type: aj.job_type,
+    tech: aj.assigned_technician_id,
+    status: aj.status,
+    slaMins: (aj.sla_minutes_remaining !== null && aj.sla_minutes_remaining !== undefined) ? Math.round(aj.sla_minutes_remaining) : 999,
+    pos: projectLatLng(aj.site.lat, aj.site.lng),
+    checklist: aj.checklist.map(c => [c.label, !!c.satisfied_by_capture_id, c.id]),
+    proofs: [],
+    tl: [],
+    _live: true,
+  };
+}
+
+function apiTechToLocal(at, jobsById){
+  let status = 'idle', color = 'faint';
+  if(at.active_job_id && jobsById[at.active_job_id]){
+    const js = jobsById[at.active_job_id].status;
+    if(js === 'onsite'){ status = 'onsite'; color = 'green'; }
+    else { status = 'enroute'; color = 'blue'; }
+  }
+  const init = at.name.split(' ').map(n=>n[0]).join('');
+  const pos = (at.lat != null && at.lng != null) ? projectLatLng(at.lat, at.lng) : null;
+  return {id: at.id, name: at.name, init, status, color, pos};
+}
+
+const FLAG_GRADS = [
+  'linear-gradient(135deg,#4E1D1D,#1F0D0D)','linear-gradient(135deg,#4E3D1D,#241C0D)','linear-gradient(135deg,#1D2A4E,#0D1220)'
+];
+function hashStr(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h); }
+
+const EVENT_LABELS = {
+  job_assigned: 'Ticket assigned to technician',
+  job_status_changed: (p)=>`Status changed to ${p.to_status}`,
+  geofence_entered: 'Arrived on site — geofence confirmed',
+  geofence_exited: 'Departed the job site geofence',
+  job_completed: 'Job closed automatically — all checklist items verified',
+  capture_initiated: 'Technician submitted a capture',
+  capture_verified: 'Capture auto-verified by the verification engine',
+  capture_flagged: (p)=> `Capture flagged for review${p.reason ? ' — ' + p.reason : ''}`,
+  capture_resolved: (p)=>`Capture ${p.resolution} by dispatcher`,
+  checklist_item_satisfied: 'Checklist item satisfied',
+  invoice_generated: 'Invoice generated from verified job data',
+};
+function eventToLabel(e){
+  const l = EVENT_LABELS[e.event_type];
+  if(!l) return e.event_type;
+  return typeof l === 'function' ? l(e.payload || {}) : l;
+}
+
+async function tryLoadLive(){
+  try{
+    const [apiJobs, apiTechs] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/jobs`),
+      fetchJSON(`${API_BASE}/v1/technicians`),
+    ]);
+    const jobsByIdRaw = Object.fromEntries(apiJobs.map(j=>[j.id, j]));
+    const localJobs = apiJobs.map(apiJobToLocal);
+    const localTechs = apiTechs.map(t=>apiTechToLocal(t, jobsByIdRaw));
+
+    const reviewRes = await fetchJSON(`${API_BASE}/v1/review-queue?status=open`);
+    const jobSiteById = Object.fromEntries(localJobs.map(j=>[j.id, j.site]));
+    const techNameById = Object.fromEntries(localTechs.map(t=>[t.id, t.name]));
+    const localFlagged = reviewRes.map(f=>({
+      id: f.capture_id, jobId: f.job_id,
+      site: jobSiteById[f.job_id] || f.job_id,
+      tech: techNameById[f.technician_id] || f.technician_id,
+      reason: f.reason || 'Flagged by the verification engine.',
+      time: new Date(f.capture_ts).toLocaleTimeString('en-US', {hour12:true}),
+      grad: FLAG_GRADS[hashStr(f.capture_id) % FLAG_GRADS.length],
+      resolved: null,
+    }));
+
+    // preserve any already-loaded proof/timeline detail for the open drawer's job
+    if(LIVE && selectedJobId){
+      const prev = jobs.find(j=>j.id===selectedJobId);
+      const next = localJobs.find(j=>j.id===selectedJobId);
+      if(prev && next){ next.proofs = prev.proofs; next.tl = prev.tl; }
+    }
+
+    jobs = localJobs; TECHS = localTechs; flagged = localFlagged;
+    LIVE = true;
+    setConnBadge(true);
+  }catch(err){
+    if(!LIVE){ jobs = MOCK_JOBS; TECHS = MOCK_TECHS; flagged = MOCK_FLAGGED; }
+    setConnBadge(false);
+  }
+  renderMap(); renderJobs(); renderTechs(); renderReview();
+}
+
+async function loadJobDetail(jobId){
+  if(!LIVE) return;
+  const j = jobs.find(x=>x.id===jobId);
+  if(!j) return;
+  try{
+    const [captures, events] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/jobs/${jobId}/captures`),
+      fetchJSON(`${API_BASE}/v1/audit-events?entity_id=${jobId}&limit=30`),
+    ]);
+    const labelById = Object.fromEntries(j.checklist.map(c => [c[2], c[0]]));
+    j.proofs = captures.map(c => ({
+      cap: c.checklist_item_id ? (labelById[c.checklist_item_id] || 'Field capture') : 'Field capture',
+      time: new Date(c.capture_ts).toLocaleTimeString('en-US', {hour12:true}),
+      tag: c.capture_type.toUpperCase(),
+      verified: c.status === 'verified' || c.status === 'resolved_approved',
+    }));
+    const chrono = events.slice().reverse();
+    j.tl = chrono.length
+      ? chrono.map(e => [new Date(e.ts).toLocaleTimeString('en-US', {hour12:true}), eventToLabel(e), true])
+      : [['—', 'No live activity yet on this job.', false]];
+
+    if(selectedJobId === jobId && drawer.classList.contains('open')){
+      renderProofs(j);
+      document.getElementById('d-timeline').innerHTML = j.tl.map(([time,label,active])=>`
+        <div class="tl-item ${active?'active':''}">
+          <div class="tl-time">${time}</div>
+          <div class="tl-label">${label}</div>
+        </div>
+      `).join('');
+    }
+  }catch(err){ /* keep whatever was already cached */ }
+}
+
+const REASON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.7 17.1a1.6 1.6 0 001.4 2.4h15.8a1.6 1.6 0 001.4-2.4L13.7 3.9a1.6 1.6 0 00-2.8 0z"/></svg>';
+
+function renderReview(){
+  const list = document.getElementById('review-list');
+  const openCount = flagged.filter(f=>!f.resolved).length;
+  document.getElementById('review-count').textContent = `(${openCount})`;
+  document.getElementById('stat-flagged').textContent = openCount;
+
+  if(flagged.length===0){
+    list.innerHTML = `<div class="review-empty">Nothing waiting on review.</div>`;
+    return;
+  }
+  list.innerHTML = flagged.map(f=>`
+    <div class="review-card ${f.resolved?'resolved':''}" data-id="${f.id}">
+      <div class="review-top">
+        <div class="review-thumb" style="background:${f.grad}"></div>
+        <div class="review-info">
+          <div class="review-job mono">${f.jobId} · ${f.id}</div>
+          <div class="review-site">${f.site}</div>
+          <div class="review-tech">${f.tech} · ${f.time}</div>
+        </div>
+      </div>
+      <div class="review-reason">${REASON_ICON}<span>${f.reason}</span></div>
+      ${f.resolved
+        ? `<div class="review-resolved-tag">${f.resolved==='approved'
+            ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg> Approved — checklist updated, audit logged'
+            : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg> Rejected — technician notified to recapture'}</div>`
+        : `<div class="review-actions">
+            <button class="btn approve" data-action="approve" data-id="${f.id}">Approve</button>
+            <button class="btn reject" data-action="reject" data-id="${f.id}">Reject &amp; request recapture</button>
+          </div>`
+      }
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-action]').forEach(btn=>{
+    btn.addEventListener('click', async (e)=>{
+      const id = e.currentTarget.dataset.id;
+      const action = e.currentTarget.dataset.action;
+      const item = flagged.find(f=>f.id===id);
+      if(!item) return;
+      if(LIVE){
+        try{
+          await fetchJSON(`${API_BASE}/v1/captures/${id}/resolve`, {method:'POST', body:{
+            resolution: action==='approve' ? 'approved' : 'rejected',
+            resolved_by: 'dispatcher:D-Vance',
+          }});
+        }catch(err){
+          showToast('Could not reach backend to resolve this capture');
+          return;
+        }
+      }
+      item.resolved = action;
+      renderReview();
+      showToast(action==='approve'
+        ? `${id} approved · added to ${item.jobId}'s audit trail`
+        : `${id} rejected · ${item.tech.split(' ')[0]} notified to recapture`);
+      if(LIVE) tryLoadLive();
+    });
+  });
+}
+
+const statusPill = {onsite:['onsite','On site'], enroute:['enroute','En route'], done:['done','Completed'], risk:['risk','SLA risk'], queued:['queued','Unassigned']};
+const dotColor = {green:'var(--green)', blue:'var(--blue)', faint:'var(--text-faint)'};
+
+/* ---------------- Clock ---------------- */
+function tickClock(){
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US',{hour12:true});
+}
+setInterval(tickClock,1000); tickClock();
+
+/* ---------------- Render map ---------------- */
+const svg = document.getElementById('map-svg');
+function buildMapGrid(){
+  let html = '';
+  // subtle grid
+  for(let x=0;x<=800;x+=40) html += `<line x1="${x}" y1="0" x2="${x}" y2="620" stroke="#141C25" stroke-width="1"/>`;
+  for(let y=0;y<=620;y+=40) html += `<line x1="0" y1="${y}" x2="800" y2="${y}" stroke="#141C25" stroke-width="1"/>`;
+  // a few "highway" lines for texture
+  html += `<line x1="0" y1="230" x2="800" y2="200" stroke="#1D2833" stroke-width="6" opacity="0.6"/>`;
+  html += `<line x1="260" y1="0" x2="480" y2="620" stroke="#1D2833" stroke-width="6" opacity="0.6"/>`;
+  svg.innerHTML = html;
+}
+buildMapGrid();
+
+function jitter(seed){ return (Math.sin(seed*999)*8); }
+
+function renderMap(){
+  // remove old dynamic nodes
+  svg.querySelectorAll('.dyn').forEach(n=>n.remove());
+  // site markers for queued/risk jobs (no tech position tied)
+  jobs.forEach((j,i)=>{
+    if(j.status==='queued' || j.status==='risk'){
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class','dyn site-marker');
+      g.innerHTML = `<rect x="${j.pos.x-6}" y="${j.pos.y-6}" width="12" height="12" rx="3" fill="none" stroke="${j.status==='risk'?'var(--red)':'var(--amber)'}" stroke-width="1.6" transform="rotate(45 ${j.pos.x} ${j.pos.y})"/>`;
+      g.addEventListener('click',()=>openDrawer(j.id));
+      svg.appendChild(g);
+    }
+  });
+  // technician pins
+  TECHS.forEach((t,i)=>{
+    const job = jobs.find(j=>j.tech===t.id);
+    let pos = t.pos || (job ? job.pos : SITES[(i+3)%SITES.length]);
+    const dx = jitter(i+animFrame*0.02), dy = jitter(i*1.7+animFrame*0.02+3);
+    const x = pos.x+dx*0.4, y = pos.y+dy*0.4;
+    const col = dotColor[t.color];
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','dyn tech-pin'+(selectedTech===t.id?' selected':''));
+    g.setAttribute('transform',`translate(${x},${y})`);
+    g.innerHTML = `
+      <circle class="ring" r="14" fill="none" stroke="${col}" stroke-width="1.4"/>
+      <circle r="6" fill="${col}"/>
+      <circle r="6" fill="none" stroke="#06090C" stroke-width="1.5"/>
+      <text class="label" y="-16" text-anchor="middle">${t.init} · ${t.id}</text>
+    `;
+    g.addEventListener('click',()=>{ selectedTech = t.id; showTab('techs'); renderTechs(); renderMap(); });
+    svg.appendChild(g);
+  });
+}
+
+let animFrame = 0, selectedTech = null;
+function animateTick(){ animFrame++; renderMap(); }
+setInterval(animateTick, 1800);
+
+/* ---------------- Render job list ---------------- */
+const jobsList = document.getElementById('jobs-list');
+let selectedJobId = null;
+
+function slaLabel(mins){
+  if(mins<0) return {cls:'bad', text:`${Math.abs(mins)}m over SLA`};
+  if(mins<20) return {cls:'warn', text:`${mins}m to SLA`};
+  return {cls:'ok', text:`${mins}m to SLA`};
+}
+
+function renderJobs(){
+  jobsList.innerHTML='';
+  jobs.forEach(j=>{
+    const tech = TECHS.find(t=>t.id===j.tech);
+    const sla = slaLabel(j.slaMins);
+    const [pillCls,pillText] = statusPill[j.status];
+    const card = document.createElement('div');
+    card.className = 'job-card'+(selectedJobId===j.id?' selected':'');
+    card.innerHTML = `
+      <div class="job-top">
+        <div>
+          <div class="job-id mono">${j.id}</div>
+          <div class="job-site">${j.site}</div>
+          <div class="job-type">${j.type}</div>
+        </div>
+        <span class="pill ${pillCls}">${pillText}</span>
+      </div>
+      <div class="job-meta">
+        <div class="job-tech">${tech?`<span class="dot" style="background:${dotColor[tech.color]}"></span>${tech.name}`:'<span style="color:var(--text-faint)">Unassigned</span>'}</div>
+        <div class="job-sla ${sla.cls}">${sla.text}</div>
+      </div>
+    `;
+    card.addEventListener('click',()=>openDrawer(j.id));
+    jobsList.appendChild(card);
+  });
+  document.getElementById('jobs-count').textContent = `(${jobs.length})`;
+}
+
+/* ---------------- Render tech list ---------------- */
+const techsList = document.getElementById('techs-list');
+function renderTechs(){
+  techsList.innerHTML='';
+  TECHS.forEach(t=>{
+    const job = jobs.find(j=>j.tech===t.id);
+    const statusText = t.status==='onsite'?'On site':t.status==='enroute'?'En route':'Idle';
+    const row = document.createElement('div');
+    row.className='tech-row';
+    row.style.borderColor = selectedTech===t.id ? 'var(--blue)' : '';
+    row.innerHTML = `
+      <div class="tech-av">${t.init}</div>
+      <div class="tech-info">
+        <div class="tech-name">${t.name}</div>
+        <div class="tech-status"><span class="dot" style="background:${dotColor[t.color]}"></span>${statusText}${job?' · '+job.id:''}</div>
+      </div>
+      <div class="tech-gps">${(32.77+jitter(1)*0.001).toFixed(4)}° N<br>${(-96.79+jitter(2)*0.001).toFixed(4)}° W</div>
+    `;
+    row.addEventListener('click',()=>{ selectedTech=t.id; if(job) openDrawer(job.id); renderTechs(); renderMap(); });
+    techsList.appendChild(row);
+  });
+  document.getElementById('techs-count').textContent = `(${TECHS.length})`;
+}
+
+/* ---------------- Tabs ---------------- */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>showTab(tab.dataset.tab));
+});
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  jobsList.style.display = name==='jobs' ? 'flex':'none';
+  techsList.style.display = name==='techs' ? 'flex':'none';
+  document.getElementById('review-list').style.display = name==='review' ? 'flex':'none';
+}
+document.getElementById('nav-review').addEventListener('click', ()=>{
+  document.querySelectorAll('.nav-btn').forEach(n=>n.classList.remove('active'));
+  document.getElementById('nav-review').classList.add('active');
+  showTab('review');
+});
+document.querySelector('.nav-btn[title="Dispatch Map"]')?.addEventListener('click', ()=>{
+  document.querySelectorAll('.nav-btn').forEach(n=>n.classList.remove('active'));
+  document.querySelector('.nav-btn[title="Dispatch Map"]').classList.add('active');
+  showTab('jobs');
+});
+
+/* ---------------- Drawer ---------------- */
+const drawer = document.getElementById('drawer');
+const backdrop = document.getElementById('backdrop');
+
+function openDrawer(jobId){
+  selectedJobId = jobId;
+  const j = jobs.find(x=>x.id===jobId);
+  const tech = TECHS.find(t=>t.id===j.tech);
+  document.getElementById('d-id').textContent = j.id + ' · ' + j.type.toUpperCase();
+  document.getElementById('d-site').textContent = j.site;
+  document.getElementById('d-sub').textContent = j.type;
+  document.getElementById('d-tech').textContent = tech ? tech.name : 'Unassigned';
+  const sla = slaLabel(j.slaMins);
+  document.getElementById('d-sla').innerHTML = `<span style="color:${sla.cls==='bad'?'var(--red)':sla.cls==='warn'?'var(--amber)':'var(--text)'}">${sla.text}</span>`;
+  document.getElementById('d-status').textContent = statusPill[j.status][1];
+
+  document.getElementById('d-checklist').innerHTML = j.checklist.map(([label,done])=>`
+    <div class="check-item ${done?'done':'pending'}">
+      <div class="check-box ${done?'done':''}">${done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+      <span>${label}</span>
+      ${done?'<span class="auto-tag">FROM PROOF</span>':''}
+    </div>
+  `).join('');
+
+  renderProofs(j);
+
+  document.getElementById('d-timeline').innerHTML = j.tl.map(([time,label,active])=>`
+    <div class="tl-item ${active?'active':''}">
+      <div class="tl-time">${time}</div>
+      <div class="tl-label">${label}</div>
+    </div>
+  `).join('');
+
+  renderJobs();
+  drawer.classList.add('open'); backdrop.classList.add('open');
+  if(LIVE) loadJobDetail(jobId);
+}
+function closeDrawer(){ drawer.classList.remove('open'); backdrop.classList.remove('open'); }
+document.getElementById('d-close').addEventListener('click', closeDrawer);
+backdrop.addEventListener('click', closeDrawer);
+
+const PROOF_GRADIENTS = [
+  'linear-gradient(135deg,#1D3A4E,#0D1A24)','linear-gradient(135deg,#1D4E42,#0D2018)',
+  'linear-gradient(135deg,#4E3D1D,#241C0D)','linear-gradient(135deg,#3A1D4E,#1A0D24)',
+  'linear-gradient(135deg,#1D2A4E,#0D1220)'
+];
+
+function renderProofs(j){
+  const wrap = document.getElementById('d-proofs');
+  wrap.innerHTML = j.proofs.map((p,i)=>`
+    <div class="proof-item">
+      <div class="proof-media" style="background:${PROOF_GRADIENTS[i%PROOF_GRADIENTS.length]}">
+        <div class="proof-badge ${p.verified?'':'verifying'}">
+          ${p.verified? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg> Verified' : 'Verifying…'}
+        </div>
+        <div class="proof-overlay">${j.site}<br>${p.time} · GPS 32.77°N –96.79°W · geofence match</div>
+      </div>
+      <div class="proof-meta">
+        <div class="proof-cap">${p.cap}</div>
+        <div class="proof-type">${p.tag}</div>
+      </div>
+    </div>
+  `).join('') || `<div style="color:var(--text-faint);font-size:12.5px;padding:14px 0;">No media captured yet. Proof will appear here the moment the technician submits a photo or video on site.</div>`;
+}
+
+const CAPTURE_LIBRARY = [
+  'Panel labeled & closed out', 'Final power-on test', 'Signal test — pass', 'Site left clean, debris removed',
+  'Client walkthrough recorded', 'Serial numbers logged', 'Before/after comparison', 'Termination close-up'
+];
+
+async function simulateLiveCapture(j){
+  try{
+    const pending = j.checklist.find(c=>!c[1]);
+    const checklistItemId = pending ? pending[2] : null;
+    const jobDetail = await fetchJSON(`${API_BASE}/v1/jobs/${j.id}`);
+    const lat = jobDetail.site.lat, lng = jobDetail.site.lng;
+    const hash = 'sha256:' + Math.random().toString(16).slice(2) + Date.now();
+    const initRes = await fetchJSON(`${API_BASE}/v1/captures/init`, {method:'POST', body:{
+      job_id: j.id, technician_id: j.tech, checklist_item_id: checklistItemId,
+      capture_type: Math.random() > 0.5 ? 'photo' : 'video',
+      content_hash: hash, capture_lat: lat, capture_lng: lng,
+    }});
+    const result = await fetchJSON(`${API_BASE}/v1/captures/${initRes.capture_id}/complete`, {method:'POST', body:{}});
+    showToast(result.status === 'verified'
+      ? 'Photo verified · GPS + timestamp matched job site'
+      : `Flagged for review: ${result.flag_reason}`);
+    await tryLoadLive();
+    await loadJobDetail(j.id);
+    const refreshed = jobs.find(x=>x.id===j.id);
+    if(refreshed && selectedJobId===j.id){
+      document.getElementById('d-checklist').innerHTML = refreshed.checklist.map(([label,done])=>`
+        <div class="check-item ${done?'done':'pending'}">
+          <div class="check-box ${done?'done':''}">${done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+          <span>${label}</span>
+          ${done?'<span class="auto-tag">FROM PROOF</span>':''}
+        </div>
+      `).join('');
+      document.getElementById('d-status').textContent = statusPill[refreshed.status][1];
+    }
+  }catch(err){
+    showToast('Could not reach the backend — is it running on :8000?');
+  }
+}
+
+document.getElementById('d-capture').addEventListener('click', async ()=>{
+  const j = jobs.find(x=>x.id===selectedJobId);
+  if(!j) return;
+  if(LIVE && j.tech){
+    simulateLiveCapture(j);
+    return;
+  }
+  const cap = CAPTURE_LIBRARY[Math.floor(Math.random()*CAPTURE_LIBRARY.length)];
+  const now = new Date().toLocaleTimeString('en-US',{hour12:true});
+  const entry = {cap, time:now, tag: Math.random()>0.5?'PHOTO':'VIDEO', verified:false};
+  j.proofs.push(entry);
+  renderProofs(j);
+  // mark next pending checklist item done, mimicking auto-detection from media
+  const pending = j.checklist.find(c=>!c[1]);
+  setTimeout(()=>{
+    entry.verified = true;
+    if(pending) pending[1] = true;
+    if(j.checklist.every(c=>c[1]) && j.status!=='done'){ j.status='done'; }
+    renderProofs(j);
+    document.getElementById('d-checklist').innerHTML = j.checklist.map(([label,done])=>`
+      <div class="check-item ${done?'done':'pending'}">
+        <div class="check-box ${done?'done':''}">${done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>':''}</div>
+        <span>${label}</span>
+        ${done?'<span class="auto-tag">FROM PROOF</span>':''}
+      </div>
+    `).join('');
+    document.getElementById('d-status').textContent = statusPill[j.status][1];
+    renderJobs();
+    showToast(`${entry.tag==='PHOTO'?'Photo':'Video'} verified · GPS + timestamp matched job site`);
+  }, 900);
+});
+
+/* ---------------- Toast ---------------- */
+let toastTimer;
+function showToast(text){
+  clearTimeout(toastTimer);
+  document.getElementById('toast-text').textContent = text;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* ---------------- Init ---------------- */
+// paint immediately with demo data so there's never a blank first load,
+// then attempt to upgrade to the real backend in the background
+jobs = MOCK_JOBS; TECHS = MOCK_TECHS; flagged = MOCK_FLAGGED;
+setConnBadge(false);
+renderMap();
+renderJobs();
+renderTechs();
+renderReview();
+tryLoadLive();
+setInterval(tryLoadLive, 8000);
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

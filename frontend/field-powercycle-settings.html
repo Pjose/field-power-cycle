@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;height:100%;overflow:hidden;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  .app{display:grid;grid-template-rows:56px 1fr;height:100vh;width:100vw;}
+
+  .topbar{display:flex;align-items:center;gap:22px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D131A,#0B0F14);}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:2px;font-family:'Inter';}
+  .save-note{margin-left:auto;font-size:11.5px;color:var(--text-faint);display:flex;align-items:center;gap:7px;}
+  .save-note svg{width:13px;stroke:var(--green);}
+
+  .main{display:grid;grid-template-columns:220px 1fr;overflow:hidden;}
+
+  .settings-nav{border-right:1px solid var(--line);padding:16px 10px;overflow-y:auto;}
+  .nav-item{padding:10px 13px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text-faint);cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:9px;}
+  .nav-item svg{width:15px;flex-shrink:0;}
+  .nav-item:hover{color:var(--text-dim);background:#141C25;}
+  .nav-item.active{color:var(--blue);background:var(--blue-dim);}
+
+  .content{overflow-y:auto;padding:26px 34px 60px;}
+  .content::-webkit-scrollbar{width:8px;} .content::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+  .panel{display:none;max-width:820px;}
+  .panel.active{display:block;}
+
+  .panel-title{font-family:'Space Grotesk';font-size:19px;font-weight:600;}
+  .panel-sub{font-size:12.5px;color:var(--text-faint);margin-top:5px;margin-bottom:26px;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px 22px;margin-bottom:16px;}
+  .card-title{font-family:'Space Grotesk';font-size:13.5px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
+  .card-title .hint{font-size:11px;color:var(--text-faint);font-weight:500;font-family:'Inter';}
+
+  .field-row{display:grid;grid-template-columns:180px 1fr;gap:16px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line-soft);}
+  .field-row:last-child{border-bottom:none;}
+  .field-label{font-size:12.5px;color:var(--text-dim);}
+  .field-hint{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+  input[type=text], input[type=number], select{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);font-family:'Inter';font-size:12.5px;
+    padding:9px 12px;border-radius:8px;width:100%;outline:none;
+  }
+  input[type=text]:focus, input[type=number]:focus, select:focus{border-color:var(--blue);}
+  .inline-field{display:flex;align-items:center;gap:8px;max-width:220px;}
+  .inline-field input{width:90px;}
+  .unit{font-size:11.5px;color:var(--text-faint);}
+
+  .toggle{width:36px;height:20px;border-radius:20px;background:var(--line);position:relative;flex-shrink:0;cursor:pointer;transition:.15s;}
+  .toggle.on{background:var(--green-dim);}
+  .toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text-faint);transition:.15s;}
+  .toggle.on::after{background:var(--green);transform:translateX(16px);}
+
+  .hours-grid{display:grid;grid-template-columns:100px 1fr 1fr auto;gap:10px;align-items:center;padding:8px 0;}
+  .hours-day{font-size:12px;color:var(--text-dim);font-weight:600;}
+  .hours-grid input{padding:7px 10px;font-size:11.5px;}
+
+  /* SLA tiers */
+  .tier-card{border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:12px;background:var(--panel-2);}
+  .tier-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .tier-name-row{display:flex;align-items:center;gap:10px;}
+  .tier-dot{width:9px;height:9px;border-radius:50%;}
+  .tier-name{font-size:13.5px;font-weight:700;}
+  .tier-badge{font-size:10px;font-family:'IBM Plex Mono';color:var(--text-faint);}
+  .tier-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .tier-field .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px;}
+
+  /* geofence table */
+  .geo-table{width:100%;border-collapse:collapse;}
+  .geo-table th{text-align:left;font-size:10px;color:var(--text-faint);font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--line);}
+  .geo-table td{padding:10px;border-bottom:1px solid var(--line-soft);font-size:12px;color:var(--text-dim);}
+  .geo-table tr:last-child td{border-bottom:none;}
+  .geo-table input{padding:6px 9px;font-size:11.5px;width:80px;}
+  .site-name{color:var(--text);font-weight:600;}
+
+  /* client accounts */
+  .client-row{display:flex;align-items:center;gap:14px;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:13px 16px;margin-bottom:9px;}
+  .client-av{width:38px;height:38px;border-radius:10px;background:#1A2530;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:600;font-size:12px;color:var(--text-dim);flex-shrink:0;}
+  .client-info{flex:1;}
+  .client-name{font-size:13px;font-weight:600;}
+  .client-meta{font-size:11px;color:var(--text-faint);margin-top:2px;}
+  .tier-pill{font-size:10.5px;font-weight:700;padding:4px 11px;border-radius:20px;}
+
+  /* integrations */
+  .integ-row{display:flex;align-items:center;gap:14px;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:14px 17px;margin-bottom:10px;}
+  .integ-icon{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+  .integ-icon svg{width:18px;}
+  .integ-info{flex:1;}
+  .integ-name{font-size:13px;font-weight:600;}
+  .integ-meta{font-size:11px;color:var(--text-faint);margin-top:2px;font-family:'IBM Plex Mono';}
+  .status-pill{font-size:10.5px;font-weight:700;padding:4px 11px;border-radius:20px;}
+  .status-pill.connected{background:var(--green-dim);color:var(--green);}
+  .status-pill.action{background:var(--amber-dim);color:var(--amber);}
+
+  .save-bar{position:sticky;bottom:0;background:linear-gradient(0deg,var(--bg) 70%,transparent);padding:18px 0 4px;display:flex;justify-content:flex-end;gap:10px;margin-top:10px;}
+  .btn{border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);font-weight:600;font-size:12.5px;padding:10px 18px;border-radius:9px;cursor:pointer;}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#06141F;}
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>Field PowerCycle<span class="sub">— Settings</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a><a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a><a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a><div class="switcher-item current">Settings</div><a class="switcher-item" href="field-powercycle-billing.html">Billing</a><a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a><a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="save-note"><svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg><span id="save-status">All changes saved</span></div>
+  </div>
+
+  <div class="main">
+    <div class="settings-nav" id="settings-nav">
+      <div class="nav-item active" data-p="general"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 01-4 0v-.09A1.7 1.7 0 008.98 19a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.62 15a1.7 1.7 0 00-1.55-1H3a2 2 0 010-4h.09A1.7 1.7 0 004.62 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.62a1.7 1.7 0 001-1.55V3a2 2 0 014 0v.09a1.7 1.7 0 001 1.55 1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.14.36.4.68.72.94"/></svg>General</div>
+      <div class="nav-item" data-p="sla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>SLA tiers</div>
+      <div class="nav-item" data-p="geofence"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>Geofencing</div>
+      <div class="nav-item" data-p="clients"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Client accounts</div>
+      <div class="nav-item" data-p="integrations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3H5a2 2 0 00-2 2v4M15 3h4a2 2 0 012 2v4M9 21H5a2 2 0 01-2-2v-4M15 21h4a2 2 0 002-2v-4"/></svg>Integrations</div>
+    </div>
+
+    <div class="content">
+      <!-- GENERAL -->
+      <div class="panel active" id="panel-general">
+        <div class="panel-title">General</div>
+        <div class="panel-sub">Company details, timezone, and business hours used across dispatch and reporting</div>
+
+        <div class="card">
+          <div class="card-title">Organization</div>
+          <div class="field-row"><div class="field-label">Company name</div><input type="text" value="PowerCycle360"></div>
+          <div class="field-row"><div class="field-label">Primary region</div><input type="text" value="Dallas–Fort Worth, TX"></div>
+          <div class="field-row"><div class="field-label">Time zone</div>
+            <select><option>Central Time (US) — America/Chicago</option><option>Eastern Time (US)</option><option>Mountain Time (US)</option><option>Pacific Time (US)</option></select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Business hours <span class="hint">Jobs dispatched outside these hours are flagged as after-hours / emergency</span></div>
+          <div class="hours-grid"><div class="hours-day">Mon–Fri</div><input type="text" value="7:00 AM"><input type="text" value="7:00 PM"><div class="toggle on"></div></div>
+          <div class="hours-grid"><div class="hours-day">Saturday</div><input type="text" value="8:00 AM"><input type="text" value="4:00 PM"><div class="toggle on"></div></div>
+          <div class="hours-grid"><div class="hours-day">Sunday</div><input type="text" value="—" disabled><input type="text" value="—" disabled><div class="toggle"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Dispatch defaults</div>
+          <div class="field-row"><div class="field-label">Location ping interval<div class="field-hint">How often the technician app reports GPS while a job is active</div></div>
+            <div class="inline-field"><input type="number" value="15"><span class="unit">seconds</span></div></div>
+          <div class="field-row"><div class="field-label">Auto-assignment<div class="field-hint">Let the system assign routine tickets without dispatcher confirmation</div></div><div class="toggle" id="tg-auto"></div></div>
+          <div class="field-row"><div class="field-label">Require dispatcher confirmation<div class="field-hint">Always require manual confirmation for emergency break-fix tickets</div></div><div class="toggle on"></div></div>
+        </div>
+      </div>
+
+      <!-- SLA TIERS -->
+      <div class="panel" id="panel-sla">
+        <div class="panel-title">SLA tiers</div>
+        <div class="panel-sub">Response and resolution targets — assigned per client account, drives the SLA countdowns shown across dispatch and analytics</div>
+
+        <div class="tier-card">
+          <div class="tier-head"><div class="tier-name-row"><span class="tier-dot" style="background:var(--red)"></span><span class="tier-name">Emergency</span><span class="tier-badge mono">TIER-01</span></div><div class="toggle on"></div></div>
+          <div class="tier-fields">
+            <div class="tier-field"><div class="l">Response target</div><div class="inline-field"><input type="number" value="30"><span class="unit">min</span></div></div>
+            <div class="tier-field"><div class="l">Resolution target</div><div class="inline-field"><input type="number" value="2"><span class="unit">hrs</span></div></div>
+            <div class="tier-field"><div class="l">Escalation buffer</div><div class="inline-field"><input type="number" value="10"><span class="unit">min</span></div></div>
+          </div>
+        </div>
+
+        <div class="tier-card">
+          <div class="tier-head"><div class="tier-name-row"><span class="tier-dot" style="background:var(--amber)"></span><span class="tier-name">Priority</span><span class="tier-badge mono">TIER-02</span></div><div class="toggle on"></div></div>
+          <div class="tier-fields">
+            <div class="tier-field"><div class="l">Response target</div><div class="inline-field"><input type="number" value="2"><span class="unit">hrs</span></div></div>
+            <div class="tier-field"><div class="l">Resolution target</div><div class="inline-field"><input type="number" value="8"><span class="unit">hrs</span></div></div>
+            <div class="tier-field"><div class="l">Escalation buffer</div><div class="inline-field"><input type="number" value="30"><span class="unit">min</span></div></div>
+          </div>
+        </div>
+
+        <div class="tier-card">
+          <div class="tier-head"><div class="tier-name-row"><span class="tier-dot" style="background:var(--green)"></span><span class="tier-name">Standard</span><span class="tier-badge mono">TIER-03</span></div><div class="toggle on"></div></div>
+          <div class="tier-fields">
+            <div class="tier-field"><div class="l">Response target</div><div class="inline-field"><input type="number" value="4"><span class="unit">hrs</span></div></div>
+            <div class="tier-field"><div class="l">Resolution target</div><div class="inline-field"><input type="number" value="2"><span class="unit">days</span></div></div>
+            <div class="tier-field"><div class="l">Escalation buffer</div><div class="inline-field"><input type="number" value="1"><span class="unit">hr</span></div></div>
+          </div>
+        </div>
+
+        <div class="tier-card">
+          <div class="tier-head"><div class="tier-name-row"><span class="tier-dot" style="background:var(--text-faint)"></span><span class="tier-name">Scheduled / Project</span><span class="tier-badge mono">TIER-04</span></div><div class="toggle on"></div></div>
+          <div class="tier-fields">
+            <div class="tier-field"><div class="l">Response target</div><div class="inline-field"><input type="number" value="—" disabled><span class="unit">n/a</span></div></div>
+            <div class="tier-field"><div class="l">Resolution target</div><div class="inline-field"><input type="number" value="5"><span class="unit">days</span></div></div>
+            <div class="tier-field"><div class="l">Escalation buffer</div><div class="inline-field"><input type="number" value="1"><span class="unit">day</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GEOFENCING -->
+      <div class="panel" id="panel-geofence">
+        <div class="panel-title">Geofencing</div>
+        <div class="panel-sub">Radius used to validate technician arrival and match proof-of-work captures to a job site</div>
+
+        <div class="card">
+          <div class="card-title">Default radius <span class="hint">Applied to any site without an override below</span></div>
+          <div class="field-row"><div class="field-label">Standard sites</div><div class="inline-field"><input type="number" value="120"><span class="unit">meters</span></div></div>
+          <div class="field-row"><div class="field-label">Large campus / multi-building</div><div class="inline-field"><input type="number" value="300"><span class="unit">meters</span></div></div>
+          <div class="field-row"><div class="field-label">Capture GPS accuracy floor<div class="field-hint">Captures with worse device accuracy than this are auto-flagged for review, not auto-rejected</div></div><div class="inline-field"><input type="number" value="25"><span class="unit">meters</span></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Per-site geofence radius <span class="hint" id="geo-conn-text">connecting…</span></div>
+          <table class="geo-table">
+            <thead><tr><th>Site</th><th>Client</th><th>Radius</th><th>Address</th></tr></thead>
+            <tbody id="geo-tbody">
+              <tr><td class="site-name">DFW Terminal D</td><td>Copperline Hospitality</td><td><input type="number" value="450"></td><td>Airport campus, GPS multipath near terminal structure</td></tr>
+              <tr><td class="site-name">RidgeCrest Corporate Center</td><td>—</td><td><input type="number" value="250"></td><td>Multi-building office park</td></tr>
+              <tr><td class="site-name">Bellhaven Medical Plaza</td><td>—</td><td><input type="number" value="90"></td><td>Dense urban block, tighter confirmation needed</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CLIENT ACCOUNTS -->
+      <div class="panel" id="panel-clients">
+        <div class="panel-title">Client accounts</div>
+        <div class="panel-sub">SLA tier and portal access per client — controls what shows up in each client's portal and dispatch queue</div>
+
+        <div class="client-row">
+          <div class="client-av">AD</div>
+          <div class="client-info"><div class="client-name">Apex Dining Brands</div><div class="client-meta">3 locations · Portal access enabled</div></div>
+          <span class="tier-pill" style="background:var(--amber-dim);color:var(--amber)">Priority</span>
+          <div class="toggle on"></div>
+        </div>
+        <div class="client-row">
+          <div class="client-av">CH</div>
+          <div class="client-info"><div class="client-name">Copperline Hospitality</div><div class="client-meta">6 locations · Portal access enabled</div></div>
+          <span class="tier-pill" style="background:var(--green-dim);color:var(--green)">Standard</span>
+          <div class="toggle on"></div>
+        </div>
+        <div class="client-row">
+          <div class="client-av">MH</div>
+          <div class="client-info"><div class="client-name">Meridian Health Clinic</div><div class="client-meta">2 locations · Portal access enabled</div></div>
+          <span class="tier-pill" style="background:var(--red-dim);color:var(--red)">Emergency</span>
+          <div class="toggle on"></div>
+        </div>
+        <div class="client-row">
+          <div class="client-av">FR</div>
+          <div class="client-info"><div class="client-name">Fairview Retail Park</div><div class="client-meta">1 location · Portal access pending invite</div></div>
+          <span class="tier-pill" style="background:var(--green-dim);color:var(--green)">Standard</span>
+          <div class="toggle"></div>
+        </div>
+        <div class="client-row">
+          <div class="client-av">RC</div>
+          <div class="client-info"><div class="client-name">RidgeCrest Corporate Center</div><div class="client-meta">1 location · Portal access enabled</div></div>
+          <span class="tier-pill" style="background:var(--text-faint);color:var(--bg)">Scheduled</span>
+          <div class="toggle on"></div>
+        </div>
+      </div>
+
+      <!-- INTEGRATIONS -->
+      <div class="panel" id="panel-integrations">
+        <div class="panel-title">Integrations</div>
+        <div class="panel-sub">Connected services powering location, notifications, and payments</div>
+
+        <div class="integ-row">
+          <div class="integ-icon" style="background:var(--blue-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+          <div class="integ-info"><div class="integ-name">Mapbox — routing & geofencing</div><div class="integ-meta">key: mb_live_••••••••4471</div></div>
+          <span class="status-pill connected">Connected</span>
+        </div>
+        <div class="integ-row">
+          <div class="integ-icon" style="background:var(--green-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+          <div class="integ-info"><div class="integ-name">Twilio — SMS delivery</div><div class="integ-meta">key: AC••••••••92e1</div></div>
+          <span class="status-pill connected">Connected</span>
+        </div>
+        <div class="integ-row">
+          <div class="integ-icon" style="background:var(--purple-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg></div>
+          <div class="integ-info"><div class="integ-name">SendGrid — transactional email</div><div class="integ-meta">key: SG••••••••7a03</div></div>
+          <span class="status-pill connected">Connected</span>
+        </div>
+        <div class="integ-row">
+          <div class="integ-icon" style="background:var(--amber-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <div class="integ-info"><div class="integ-name">Slack — internal dispatch alerts</div><div class="integ-meta">workspace: powercycle360.slack.com</div></div>
+          <span class="status-pill action">Reconnect needed</span>
+        </div>
+        <div class="integ-row">
+          <div class="integ-icon" style="background:var(--panel-2);border:1px dashed var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+          <div class="integ-info"><div class="integ-name">Payment processor — invoicing</div><div class="integ-meta">Not connected</div></div>
+          <span class="status-pill action">Set up</span>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn">Discard changes</button>
+        <button class="btn primary" id="save-btn">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('panel-'+item.dataset.p).classList.add('active');
+  });
+});
+
+document.querySelectorAll('.toggle').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    t.classList.toggle('on');
+    markUnsaved();
+  });
+});
+document.querySelectorAll('input, select').forEach(el=>{
+  el.addEventListener('input', markUnsaved);
+});
+
+function markUnsaved(){
+  document.getElementById('save-status').textContent = 'Unsaved changes';
+  document.querySelector('.save-note svg path').setAttribute('stroke','var(--amber)');
+}
+document.getElementById('save-btn').addEventListener('click', ()=>{
+  document.getElementById('save-status').textContent = 'All changes saved';
+  document.querySelector('.save-note svg path').setAttribute('stroke','currentColor');
+});
+
+/* ---------------- Live backend wiring ----------------
+   The per-site geofence table is the one panel in Settings backed by a
+   real, editable value (Site.geofence_radius_m) — everything else here
+   (business hours, SLA tier targets, client portal access, integrations)
+   is genuinely just reference/demo content in this backend, so only this
+   table attempts to load live and save real edits. Editing a radius here
+   calls PATCH /v1/sites/{id} immediately; the change is what the
+   verification engine actually checks captures against on the next
+   capture for that site. */
+const API_BASE = 'http://127.0.0.1:8000';
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+async function loadLiveSites(){
+  try{
+    const sites = await fetchJSON(`${API_BASE}/v1/sites`);
+    document.getElementById('geo-tbody').innerHTML = sites.map(s => `
+      <tr>
+        <td class="site-name">${s.name}</td>
+        <td>${s.client}</td>
+        <td><input type="number" value="${s.geofence_radius_m}" data-site-id="${s.id}" class="geo-radius-input"></td>
+        <td>${s.address || '—'}</td>
+      </tr>
+    `).join('');
+    document.querySelectorAll('.geo-radius-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        const siteId = inp.dataset.siteId;
+        const newVal = parseInt(inp.value, 10);
+        const statusEl = document.getElementById('save-status');
+        try{
+          await fetchJSON(`${API_BASE}/v1/sites/${siteId}`, {method:'PATCH', body:{geofence_radius_m: newVal}});
+          statusEl.textContent = `Saved — ${siteId} geofence now ${newVal}m`;
+          setTimeout(()=>{ statusEl.textContent = 'All changes saved'; }, 2400);
+        }catch(err){
+          statusEl.textContent = 'Could not save — is the backend running?';
+        }
+      });
+    });
+    document.getElementById('geo-conn-text').textContent = 'live from backend — edits save immediately';
+  }catch(err){
+    document.getElementById('geo-conn-text').textContent = 'demo data — backend offline';
+  }
+}
+loadLiveSites();
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

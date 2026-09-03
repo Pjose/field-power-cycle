@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Notifications</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;height:100%;overflow:hidden;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  .app{display:grid;grid-template-rows:56px 1fr;height:100vh;width:100vw;}
+
+  .topbar{display:flex;align-items:center;gap:22px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D131A,#0B0F14);}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:2px;font-family:'Inter';}
+  .ticker{display:flex;gap:26px;margin-left:8px;}
+  .tick{display:flex;flex-direction:column;gap:1px;}
+  .tick .v{font-family:'IBM Plex Mono';font-size:14px;font-weight:500;}
+  .tick .v.g{color:var(--green);} .tick .v.a{color:var(--amber);}
+  .tick .l{font-size:10px;color:var(--text-faint);letter-spacing:.3px;}
+  .live-badge{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-faint);}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  .main{display:grid;grid-template-columns:400px 1fr;overflow:hidden;}
+
+  /* rules column */
+  .rules-col{border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;}
+  .rules-head{padding:14px 16px 10px;border-bottom:1px solid var(--line);}
+  .rules-title{font-family:'Space Grotesk';font-weight:600;font-size:13px;}
+  .rules-sub{font-size:11px;color:var(--text-faint);margin-top:3px;}
+  .rules-list{flex:1;overflow-y:auto;padding:10px;}
+  .rules-list::-webkit-scrollbar{width:8px;} .rules-list::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+
+  .rule-group-label{font-size:10.5px;font-weight:700;color:var(--text-faint);letter-spacing:.4px;text-transform:uppercase;padding:12px 8px 7px;}
+  .rule-group-label:first-child{padding-top:4px;}
+
+  .rule-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px;cursor:pointer;margin-bottom:7px;}
+  .rule-card:hover{border-color:#33455A;}
+  .rule-card.selected{border-color:var(--blue);background:#12202C;}
+  .rule-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .rule-name{font-size:12.5px;font-weight:600;line-height:1.35;}
+  .toggle{width:32px;height:18px;border-radius:20px;background:var(--line);position:relative;flex-shrink:0;cursor:pointer;transition:.15s;}
+  .toggle.on{background:var(--green-dim);}
+  .toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--text-faint);transition:.15s;}
+  .toggle.on::after{background:var(--green);transform:translateX(14px);}
+  .rule-meta{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .rtag{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:20px;}
+  .rtag.recipient{background:var(--purple-dim);color:var(--purple);}
+  .chan-icon{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:var(--panel-2);border:1px solid var(--line);}
+  .chan-icon svg{width:10px;height:10px;stroke:var(--text-dim);}
+
+  /* detail column */
+  .detail{overflow-y:auto;padding:24px 30px 50px;}
+  .detail::-webkit-scrollbar{width:8px;} .detail::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+
+  .d-eyebrow{font-family:'IBM Plex Mono';font-size:11px;color:var(--text-faint);}
+  .d-title{font-family:'Space Grotesk';font-size:20px;font-weight:600;margin-top:4px;}
+  .d-sub{font-size:13px;color:var(--text-dim);margin-top:6px;max-width:600px;line-height:1.5;}
+
+  .d-meta-row{display:flex;gap:24px;margin-top:18px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .d-meta .l{font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.3px;}
+  .d-meta .v{font-size:12.5px;font-weight:600;margin-top:4px;}
+
+  .section-title{font-family:'Space Grotesk';font-size:13.5px;font-weight:600;margin:26px 0 14px;}
+
+  .previews{display:flex;gap:16px;flex-wrap:wrap;}
+  .preview-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;width:260px;flex-shrink:0;}
+  .preview-head{display:flex;align-items:center;gap:8px;margin-bottom:11px;}
+  .preview-head svg{width:13px;stroke:var(--text-dim);}
+  .preview-head span{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;}
+
+  .sms-bubble{background:var(--blue);color:#06141F;border-radius:14px 14px 14px 4px;padding:10px 13px;font-size:12.5px;line-height:1.5;}
+  .sms-from{font-size:10px;color:var(--text-faint);margin-bottom:6px;}
+
+  .push-mock{background:#1A232D;border:1px solid var(--line-soft);border-radius:11px;padding:11px 12px;}
+  .push-top{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+  .push-icon{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#3ED9A0,#1F8F6B);flex-shrink:0;}
+  .push-app{font-size:9.5px;color:var(--text-faint);font-weight:600;}
+  .push-title{font-size:12px;font-weight:700;}
+  .push-body{font-size:11.5px;color:var(--text-dim);margin-top:2px;line-height:1.4;}
+
+  .email-mock{background:#fff;color:#1B2733;border-radius:9px;overflow:hidden;font-size:11px;}
+  .email-head{background:#F4F6F9;padding:9px 12px;border-bottom:1px solid #DFE4EB;font-family:'IBM Plex Mono';font-size:9.5px;color:#66768A;}
+  .email-body{padding:12px;line-height:1.5;}
+  .email-subject{font-weight:700;margin-bottom:6px;font-size:11.5px;}
+
+  .var-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+  .var-chip{font-family:'IBM Plex Mono';font-size:10px;background:var(--panel-2);border:1px solid var(--line);color:var(--text-dim);padding:3px 8px;border-radius:6px;}
+
+  /* activity feed */
+  .feed-table{width:100%;border-collapse:collapse;margin-top:6px;}
+  .feed-table th{text-align:left;font-size:10px;color:var(--text-faint);font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--line);}
+  .feed-table td{padding:9px 10px;border-bottom:1px solid var(--line-soft);font-size:11.5px;color:var(--text-dim);}
+  .feed-table tr:last-child td{border-bottom:none;}
+  .dstatus{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+  .dstatus.delivered{background:var(--green-dim);color:var(--green);}
+  .dstatus.opened{background:var(--blue-dim);color:var(--blue);}
+  .dstatus.failed{background:var(--red-dim);color:var(--red);}
+  .dstatus.logged{background:var(--blue-dim);color:var(--blue);}
+  .feed-chan{display:inline-flex;align-items:center;gap:5px;}
+  .feed-chan svg{width:11px;stroke:var(--text-faint);}
+
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-faint);gap:10px;}
+  .empty-state svg{width:36px;stroke:var(--text-faint);}
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>Field PowerCycle<span class="sub">— Notifications</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a><a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a><div class="switcher-item current">Notifications</div><a class="switcher-item" href="field-powercycle-settings.html">Settings</a><a class="switcher-item" href="field-powercycle-billing.html">Billing</a><a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a><a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="ticker">
+      <div class="tick"><span class="v" id="stat-sent">1,204</span><span class="l">SENT TODAY</span></div>
+      <div class="tick"><span class="v g" id="stat-delivered">99.2%</span><span class="l">DELIVERY RATE</span></div>
+      <div class="tick"><span class="v" id="stat-rules">12</span><span class="l">ACTIVE RULES</span></div>
+    </div>
+    <div class="live-badge" id="live-badge"><span class="live-dot" id="live-dot"></span><span id="live-text">Connecting…</span></div>
+  </div>
+
+  <div class="main">
+    <div class="rules-col">
+      <div class="rules-head">
+        <div class="rules-title">Notification rules</div>
+        <div class="rules-sub">What triggers a message, to whom, over which channel</div>
+      </div>
+      <div class="rules-list" id="rules-list"></div>
+    </div>
+    <div class="detail" id="detail"></div>
+  </div>
+</div>
+
+<script>
+const CHAN_ICONS = {
+  sms: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+  push: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>',
+  email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>',
+  console: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+};
+
+const RULES = [
+  { id:'r1', group:'Client updates', name:'Technician en route', recipient:'Client', channels:['sms','push'],
+    trigger:'Fires the instant a job status flips to en_route and the assigned technician has an active GPS lock.',
+    example:{ job:'JB-4472', site:'Apex Dining Brands — Uptown' },
+    sms:"Field PowerCycle: Priya is on her way — ETA 14 min for your Payment Terminal service (JB-4472) at Apex Dining Brands, Uptown. Track live: fpc.link/t/4472",
+    push:{title:'Technician en route', body:'Priya Chandran is 14 minutes away for JB-4472 at Apex Dining Brands — Uptown.'},
+    vars:['{technician_name}','{eta_min}','{job_id}','{site_name}','{tracking_url}'] },
+
+  { id:'r2', group:'Client updates', name:'Job completed & verified', recipient:'Client', channels:['sms','email'],
+    trigger:'Fires when the last checklist item is auto-satisfied and the job status flips to done.',
+    example:{ job:'JB-4469', site:'Copperline Hospitality' },
+    sms:"Field PowerCycle: Your ticket JB-4469 is complete and verified. View the report: fpc.link/r/4469",
+    email:{subject:'Completion report ready — JB-4469', body:'Your KDS Staging job at Copperline Hospitality — Main Kitchen closed at 8:42 AM, fully verified with photo/video proof of work. No signature or paperwork needed on your end — the report is attached and also available in your portal under Ticket History.'},
+    vars:['{job_id}','{site_name}','{report_url}','{completion_time}'] },
+
+  { id:'r3', group:'Dispatch & SLA', name:'SLA breach imminent', recipient:'Dispatcher', channels:['push','console'],
+    trigger:'Fires when a job\'s SLA countdown drops below 15 minutes and no technician has been assigned.',
+    example:{ job:'JB-4478', site:'Union Square Retail #7' },
+    push:{title:'⚠ SLA at risk — JB-4478', body:'Union Square Retail #7 breaches SLA in 12 minutes and is still unassigned.'},
+    vars:['{job_id}','{site_name}','{minutes_remaining}'] },
+
+  { id:'r4', group:'Dispatch & SLA', name:'Job unassigned too long', recipient:'Dispatcher', channels:['console'],
+    trigger:'Fires when a queued job has sat unassigned for more than 20 minutes, regardless of SLA headroom.',
+    example:{ job:'JB-4475', site:'Fairview Retail Park' },
+    push:{title:'Unassigned job — JB-4475', body:'Firewall Swap at Fairview Retail Park has been unassigned for 22 minutes.'},
+    vars:['{job_id}','{site_name}','{minutes_unassigned}'] },
+
+  { id:'r5', group:'Proof of work', name:'Capture flagged for review', recipient:'Dispatcher', channels:['push','console'],
+    trigger:'Fires the moment the verification engine marks a capture as flagged rather than verified.',
+    example:{ job:'JB-4471', site:'Targeted Merchant Group #14' },
+    push:{title:'Capture flagged — JB-4471', body:'GPS 340m outside geofence. Needs manual review before checklist can close.'},
+    vars:['{job_id}','{capture_id}','{flag_reason}'] },
+
+  { id:'r6', group:'Proof of work', name:'Recapture requested', recipient:'Technician', channels:['push'],
+    trigger:'Fires when a dispatcher rejects a flagged capture from the review queue.',
+    example:{ job:'JB-4472', site:'Apex Dining Brands — Uptown' },
+    push:{title:'Recapture needed', body:'Your photo for "Diagnostic run recorded" was rejected — please recapture at JB-4472.'},
+    vars:['{job_id}','{checklist_item}','{reviewer_note}'] },
+
+  { id:'r7', group:'Workforce', name:'Certification expiring', recipient:'Technician + Admin', channels:['email','push'],
+    trigger:'Fires 30, 14, and 3 days before a certification\'s expiry date.',
+    example:{ job:null, site:null },
+    email:{subject:'Your POS Systems Certification expires soon', body:'Your POS Systems Certification expires Sep 15, 2026 (17 days). Renewal training is required to remain eligible for POS-tagged dispatch assignments. Schedule your session in the workforce portal.'},
+    push:{title:'Certification expiring soon', body:'POS Systems Certification expires in 17 days. Renewal keeps you eligible for POS jobs.'},
+    vars:['{technician_name}','{cert_name}','{expiry_date}','{days_remaining}'] },
+
+  { id:'r8', group:'Workforce', name:'New job assigned', recipient:'Technician', channels:['push'],
+    trigger:'Fires the moment a dispatcher confirms an assignment, whether manual or auto-assigned.',
+    example:{ job:'JB-4477', site:'RidgeCrest Corporate Center' },
+    push:{title:'New job assigned', body:'JB-4477 — Structured Cat6 Run at RidgeCrest Corporate Center. Window: 11:00 AM–1:00 PM.'},
+    vars:['{job_id}','{job_type}','{site_name}','{window_start}','{window_end}'] },
+];
+
+const MOCK_FEED = [
+  {t:'11:42:03', event:'Technician en route', recipient:'Rosa Nunez (Apex Dining)', chan:'sms', status:'delivered'},
+  {t:'11:41:58', event:'Technician en route', recipient:'Rosa Nunez (Apex Dining)', chan:'push', status:'opened'},
+  {t:'11:38:21', event:'Capture flagged for review', recipient:'Dispatch — D. Vance', chan:'console', status:'delivered'},
+  {t:'11:35:07', event:'Recapture requested', recipient:'Marcus Reyes', chan:'push', status:'opened'},
+  {t:'11:31:44', event:'SLA breach imminent', recipient:'Dispatch — D. Vance', chan:'push', status:'opened'},
+  {t:'11:24:19', event:'New job assigned', recipient:'Ivy Torres', chan:'push', status:'delivered'},
+  {t:'11:15:52', event:'Job completed & verified', recipient:'Facilities — Copperline', chan:'email', status:'delivered'},
+  {t:'11:15:50', event:'Job completed & verified', recipient:'Facilities — Copperline', chan:'sms', status:'failed'},
+  {t:'10:58:30', event:'Certification expiring', recipient:'Priya Chandran', chan:'push', status:'delivered'},
+  {t:'10:52:11', event:'Job unassigned too long', recipient:'Dispatch — D. Vance', chan:'console', status:'delivered'},
+];
+let FEED = MOCK_FEED;
+
+/* ---------------- Live backend wiring ----------------
+   Paints instantly with the mock rules/feed above, then tries to load real
+   rule enabled-state and a real feed built from the audit ledger. The
+   backend logs real trigger events (a capture really was flagged, a job
+   really was completed) but doesn't track real SMS/push delivery receipts
+   — that's explicitly out of scope per the architecture doc — so live feed
+   rows are marked "logged" rather than claiming a fake "delivered/opened"
+   outcome that was never actually confirmed. */
+const API_BASE = 'http://127.0.0.1:8000';
+let LIVE = false;
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function setConnStatus(isLive){
+  document.getElementById('live-dot').style.background = isLive ? 'var(--green)' : 'var(--amber)';
+  document.getElementById('live-text').textContent = isLive ? 'Live feed' : 'Demo feed — backend offline';
+}
+
+const EVENT_RULE_MAP = {
+  'job_status_changed_enroute': {ruleName:'Technician en route', chan:'sms', role:'client'},
+  'job_completed':              {ruleName:'Job completed & verified', chan:'sms', role:'client'},
+  'capture_flagged':            {ruleName:'Capture flagged for review', chan:'push', role:'dispatcher'},
+  'capture_resolved_rejected':  {ruleName:'Recapture requested', chan:'push', role:'technician'},
+  'job_assigned':                {ruleName:'New job assigned', chan:'push', role:'technician'},
+};
+
+async function loadLiveRules(){
+  try{
+    const backendRules = await fetchJSON(`${API_BASE}/v1/notification-rules`);
+    const byName = Object.fromEntries(backendRules.map(r => [r.name, r]));
+    RULES.forEach(r => {
+      const match = byName[r.name];
+      if(match){ r._backendId = match.id; rulesEnabled[r.id] = match.enabled; }
+    });
+    LIVE = true;
+    setConnStatus(true);
+    renderRules();
+    loadLiveFeed();
+  }catch(err){
+    LIVE = false;
+    setConnStatus(false);
+  }
+}
+
+async function loadLiveFeed(){
+  if(!LIVE) return;
+  try{
+    const [events, jobs, techs] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/notifications/feed?limit=30`),
+      fetchJSON(`${API_BASE}/v1/jobs`),
+      fetchJSON(`${API_BASE}/v1/technicians`),
+    ]);
+    const jobsById = Object.fromEntries(jobs.map(j => [j.id, j]));
+    const techsById = Object.fromEntries(techs.map(t => [t.id, t]));
+
+    const rows = [];
+    events.forEach(e => {
+      let key = e.event_type;
+      if(e.event_type === 'job_status_changed' && e.payload && e.payload.to_status === 'enroute') key = 'job_status_changed_enroute';
+      if(e.event_type === 'capture_resolved' && e.payload && e.payload.resolution === 'rejected') key = 'capture_resolved_rejected';
+      const rule = EVENT_RULE_MAP[key];
+      if(!rule) return;
+
+      let recipient = 'Dispatch — D. Vance';
+      if(rule.role === 'client' && e.entity_type === 'job' && jobsById[e.entity_id]){
+        recipient = jobsById[e.entity_id].site.client;
+      } else if(rule.role === 'technician'){
+        const techId = (e.payload && e.payload.technician_id) || null;
+        recipient = techId && techsById[techId] ? techsById[techId].name : 'Technician';
+      }
+
+      rows.push({
+        t: new Date(e.ts).toLocaleTimeString('en-US', {hour12:false}),
+        event: rule.ruleName, recipient, chan: rule.chan, status: 'logged',
+      });
+    });
+    FEED = rows;
+    renderDetail();
+  }catch(err){ /* keep whatever's currently showing */ }
+}
+
+let selectedRule = 'r1';
+let rulesEnabled = Object.fromEntries(RULES.map(r=>[r.id, true]));
+
+function renderRules(){
+  const groups = [...new Set(RULES.map(r=>r.group))];
+  document.getElementById('rules-list').innerHTML = groups.map(g=>`
+    <div class="rule-group-label">${g}</div>
+    ${RULES.filter(r=>r.group===g).map(r=>`
+      <div class="rule-card ${selectedRule===r.id?'selected':''}" data-id="${r.id}">
+        <div class="rule-top">
+          <div class="rule-name">${r.name}</div>
+          <div class="toggle ${rulesEnabled[r.id]?'on':''}" data-toggle="${r.id}"></div>
+        </div>
+        <div class="rule-meta">
+          <span class="rtag recipient">${r.recipient}</span>
+          ${r.channels.map(c=>`<div class="chan-icon">${CHAN_ICONS[c]}</div>`).join('')}
+        </div>
+      </div>
+    `).join('')}
+  `).join('');
+
+  document.querySelectorAll('.rule-card').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-toggle]')) return;
+      selectedRule = el.dataset.id; renderRules(); renderDetail();
+    });
+  });
+  document.querySelectorAll('[data-toggle]').forEach(t=>{
+    t.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      const id = t.dataset.toggle;
+      const rule = RULES.find(r=>r.id===id);
+      const newVal = !rulesEnabled[id];
+      if(LIVE && rule && rule._backendId){
+        try{
+          await fetchJSON(`${API_BASE}/v1/notification-rules/${rule._backendId}`, {method:'PATCH', body:{enabled:newVal}});
+        }catch(err){
+          return; // leave state unchanged if the backend rejects it
+        }
+      }
+      rulesEnabled[id] = newVal;
+      document.getElementById('stat-rules').textContent = Object.values(rulesEnabled).filter(Boolean).length;
+      renderRules();
+    });
+  });
+}
+
+function renderDetail(){
+  const r = RULES.find(x=>x.id===selectedRule);
+  const wrap = document.getElementById('detail');
+  if(!r){ wrap.innerHTML = `<div class="empty-state">Select a rule</div>`; return; }
+
+  let previews = '';
+  if(r.sms) previews += `
+    <div class="preview-card">
+      <div class="preview-head">${CHAN_ICONS.sms}<span>SMS</span></div>
+      <div class="sms-from">To client mobile</div>
+      <div class="sms-bubble">${r.sms}</div>
+    </div>`;
+  if(r.push) previews += `
+    <div class="preview-card">
+      <div class="preview-head">${CHAN_ICONS.push}<span>Push notification</span></div>
+      <div class="push-mock">
+        <div class="push-top"><div class="push-icon"></div><span class="push-app">FIELD POWERCYCLE</span></div>
+        <div class="push-title">${r.push.title}</div>
+        <div class="push-body">${r.push.body}</div>
+      </div>
+    </div>`;
+  if(r.email) previews += `
+    <div class="preview-card">
+      <div class="preview-head">${CHAN_ICONS.email}<span>Email</span></div>
+      <div class="email-mock">
+        <div class="email-head">From: notifications@fieldpowercycle.com</div>
+        <div class="email-body"><div class="email-subject">${r.email.subject}</div>${r.email.body}</div>
+      </div>
+    </div>`;
+  if(r.channels.includes('console') && !r.push){
+    previews += `
+    <div class="preview-card">
+      <div class="preview-head">${CHAN_ICONS.console}<span>Dispatch console alert</span></div>
+      <div class="push-mock">
+        <div class="push-top"><div class="push-icon" style="background:linear-gradient(135deg,#F0AC4E,#B5790C)"></div><span class="push-app">CONSOLE ALERT</span></div>
+        <div class="push-title">${r.name}</div>
+        <div class="push-body">${r.trigger}</div>
+      </div>
+    </div>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="d-eyebrow mono">${r.group.toUpperCase()} · ${rulesEnabled[r.id]?'ENABLED':'DISABLED'}</div>
+    <div class="d-title">${r.name}</div>
+    <div class="d-sub">${r.trigger}</div>
+
+    <div class="d-meta-row">
+      <div class="d-meta"><div class="l">Recipient</div><div class="v">${r.recipient}</div></div>
+      <div class="d-meta"><div class="l">Channels</div><div class="v">${r.channels.map(c=>c.toUpperCase()).join(' + ')}</div></div>
+      <div class="d-meta"><div class="l">Example trigger</div><div class="v">${r.example.job ? r.example.job+' — '+r.example.site : 'Scheduled check, not job-tied'}</div></div>
+    </div>
+
+    <div class="section-title">Message preview</div>
+    <div class="previews">${previews}</div>
+
+    <div class="section-title">Available variables</div>
+    <div class="var-list">${r.vars.map(v=>`<span class="var-chip">${v}</span>`).join('')}</div>
+  `;
+}
+
+function renderFeed(){
+  const feedHtml = `
+    <div class="section-title">Live activity feed</div>
+    <table class="feed-table">
+      <thead><tr><th>Time</th><th>Event</th><th>Recipient</th><th>Channel</th><th>Status</th></tr></thead>
+      <tbody>
+        ${FEED.map(f=>`
+          <tr>
+            <td class="mono">${f.t}</td>
+            <td>${f.event}</td>
+            <td>${f.recipient}</td>
+            <td><span class="feed-chan">${CHAN_ICONS[f.chan]}${f.chan.toUpperCase()}</span></td>
+            <td><span class="dstatus ${f.status}">${f.status}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  return feedHtml;
+}
+
+function init(){
+  renderRules();
+  renderDetail();
+  document.getElementById('detail').insertAdjacentHTML('beforeend', `<div style="margin-top:8px;">${renderFeed()}</div>`);
+}
+init();
+loadLiveRules();
+
+// re-render detail preserving the feed at bottom
+const originalRenderDetail = renderDetail;
+renderDetail = function(){
+  originalRenderDetail();
+  document.getElementById('detail').insertAdjacentHTML('beforeend', `<div style="margin-top:8px;">${renderFeed()}</div>`);
+};
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

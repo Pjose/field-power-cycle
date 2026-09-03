@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 24px 60px;}
+
+  .top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;}
+  .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;font-family:'Inter';}
+
+  .range-toggle{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px;}
+  .range-btn{padding:7px 14px;border-radius:7px;font-size:12px;font-weight:600;color:var(--text-faint);cursor:pointer;}
+  .range-btn.active{background:var(--blue-dim);color:var(--blue);}
+  .conn-badge{display:flex;align-items:center;gap:6px;font-size:10.5px;font-family:'IBM Plex Mono';color:var(--text-faint);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;flex-shrink:0;}
+  .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .conn-badge.live .conn-dot{background:var(--green);box-shadow:0 0 0 2px var(--green-dim);animation:connPulse 1.6s infinite;}
+  .conn-badge.live{color:var(--green);border-color:#245944;}
+  .conn-badge.offline .conn-dot{background:var(--amber);}
+  .conn-badge.offline{color:var(--amber);border-color:#4E3D1D;}
+  @keyframes connPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px 18px;}
+  .kpi-label{font-size:11px;color:var(--text-faint);display:flex;justify-content:space-between;align-items:center;}
+  .kpi-trend{font-family:'IBM Plex Mono';font-size:10.5px;}
+  .kpi-trend.up{color:var(--green);} .kpi-trend.down{color:var(--red);}
+  .kpi-val{font-family:'Space Grotesk';font-size:27px;font-weight:600;margin-top:8px;}
+  .kpi-sub{font-size:11px;color:var(--text-faint);margin-top:3px;}
+
+  .grid-2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px 20px;}
+  .card-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px;}
+  .card-title{font-family:'Space Grotesk';font-size:13.5px;font-weight:600;}
+  .card-sub{font-size:11px;color:var(--text-faint);}
+
+  .legend-row{display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-dim);}
+  .legend-dot{width:8px;height:8px;border-radius:2px;}
+
+  .funnel{display:flex;flex-direction:column;gap:10px;}
+  .funnel-row{display:grid;grid-template-columns:110px 1fr 54px;align-items:center;gap:12px;}
+  .funnel-label{font-size:11.5px;color:var(--text-dim);}
+  .funnel-track{height:22px;background:var(--panel-2);border-radius:6px;overflow:hidden;}
+  .funnel-fill{height:100%;border-radius:6px;display:flex;align-items:center;}
+  .funnel-val{font-family:'IBM Plex Mono';font-size:11.5px;text-align:right;}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{text-align:left;color:var(--text-faint);font-weight:600;font-size:10.5px;padding:0 10px 10px;border-bottom:1px solid var(--line);}
+  td{padding:11px 10px;border-bottom:1px solid var(--line-soft);color:var(--text-dim);}
+  tr:last-child td{border-bottom:none;}
+  td.name{color:var(--text);font-weight:600;}
+  .bar-cell{display:flex;align-items:center;gap:8px;}
+  .mini-track{width:70px;height:5px;background:var(--panel-2);border-radius:5px;overflow:hidden;flex-shrink:0;}
+  .mini-fill{height:100%;border-radius:5px;}
+  .rank-badge{width:20px;height:20px;border-radius:6px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);}
+  .rank-badge.top{background:var(--green-dim);color:var(--green);}
+
+  .footnote{margin-top:8px;font-size:11px;color:var(--text-faint);}
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="dot"></span>Field PowerCycle <span class="sub">— Analytics</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a><a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a><a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a><a class="switcher-item" href="field-powercycle-settings.html">Settings</a><a class="switcher-item" href="field-powercycle-billing.html">Billing</a><div class="switcher-item current">Analytics</div><a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="range-toggle" id="range-toggle">
+      <div class="range-btn" data-r="7">7D</div>
+      <div class="range-btn active" data-r="30">30D</div>
+      <div class="range-btn" data-r="90">90D</div>
+    </div>
+    <div class="conn-badge" id="conn-badge" style="margin-left:10px;"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting…</span></div>
+  </div>
+
+  <div class="kpi-row" id="kpi-row"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">SLA compliance trend</div><div class="card-sub">Percent of jobs closed within their SLA window</div></div>
+      </div>
+      <svg id="trend-chart" viewBox="0 0 640 200" style="width:100%;height:auto;"></svg>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">Verification funnel</div><div class="card-sub">Where proof-of-work lands this period</div></div>
+      </div>
+      <div class="funnel" id="funnel"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">Jobs by type</div><div class="card-sub">Volume across service lines</div></div>
+      </div>
+      <svg id="bar-chart" viewBox="0 0 640 210" style="width:100%;height:auto;"></svg>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div><div class="card-title">Jobs by industry</div><div class="card-sub">Share of completed work</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:22px;">
+        <svg id="donut-chart" viewBox="0 0 180 180" style="width:150px;height:150px;flex-shrink:0;"></svg>
+        <div id="donut-legend" style="flex:1;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div><div class="card-title">Technician leaderboard</div><div class="card-sub">Ranked by on-time completion rate this period</div></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Technician</th><th>Jobs closed</th><th>On-time rate</th><th id="speed-col-header">Avg. capture → verify</th><th>Proofs flagged</th></tr></thead>
+      <tbody id="tech-table"></tbody>
+    </table>
+  </div>
+
+  <div class="footnote">Figures shown are illustrative sample data for this preview.</div>
+</div>
+
+<script>
+const DATASETS = {
+  7:  { sla:96, slaTrend:1.2, jobs:41, jobsTrend:-3, resp:52, respTrend:-8, verifyRate:94, verifyTrend:2,
+        trend:[91,93,92,95,94,97,96],
+        bars:[[ 'POS Install',9],['Cat6 Run',6],['Break-Fix',12],['KDS Staging',4],['Firewall Swap',3],['Kiosk Setup',5],['Rack Cabling',2]],
+        funnel:[['Captured',210],['Auto-verified',197],['Flagged',13],['Resolved',13]],
+        donut:[['Retail',44,'var(--blue)'],['Hospitality',26,'var(--green)'],['Healthcare',18,'var(--purple)'],['Corporate',12,'var(--amber)']],
+        techs:[['Grace Halden',9,100,'6m',0],['Marcus Reyes',8,100,'9m',1],['Dana Whitfield',7,96,'11m',1],['Ivy Torres',6,92,'14m',2],['Luis Fontana',6,88,'18m',2],['Priya Chandran',5,84,'21m',3]] },
+  30: { sla:93, slaTrend:2.4, jobs:172, jobsTrend:6, resp:61, respTrend:-11, verifyRate:91, verifyTrend:3,
+        trend:[84,86,88,87,90,92,93],
+        bars:[['POS Install',38],['Cat6 Run',24],['Break-Fix',46],['KDS Staging',15],['Firewall Swap',11],['Kiosk Setup',21],['Rack Cabling',17]],
+        funnel:[['Captured',860],['Auto-verified',783],['Flagged',77],['Resolved',71]],
+        donut:[['Retail',48,'var(--blue)'],['Hospitality',24,'var(--green)'],['Healthcare',16,'var(--purple)'],['Corporate',12,'var(--amber)']],
+        techs:[['Grace Halden',34,97,'7m',3],['Marcus Reyes',31,95,'10m',4],['Dana Whitfield',29,93,'12m',5],['Ivy Torres',27,90,'15m',6],['Luis Fontana',25,86,'19m',7],['Priya Chandran',22,81,'23m',8]] },
+  90: { sla:90, slaTrend:4.1, jobs:498, jobsTrend:14, resp:68, respTrend:-15, verifyRate:89, verifyTrend:5,
+        trend:[78,81,83,85,86,88,90],
+        bars:[['POS Install',104],['Cat6 Run',71],['Break-Fix',132],['KDS Staging',44],['Firewall Swap',33],['Kiosk Setup',58],['Rack Cabling',56]],
+        funnel:[['Captured',2510],['Auto-verified',2218],['Flagged',292],['Resolved',266]],
+        donut:[['Retail',51,'var(--blue)'],['Hospitality',22,'var(--green)'],['Healthcare',15,'var(--purple)'],['Corporate',12,'var(--amber)']],
+        techs:[['Grace Halden',96,95,'8m',9],['Marcus Reyes',89,93,'11m',11],['Dana Whitfield',84,91,'13m',12],['Ivy Torres',77,88,'16m',15],['Luis Fontana',71,84,'20m',17],['Priya Chandran',63,79,'25m',19]] },
+};
+
+let range = 30;
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v.replace('var(','').replace(')','')).trim() || v; }
+function resolveColor(v){
+  if(v.startsWith('var(')){ return getComputedStyle(document.documentElement).getPropertyValue(v.slice(4,-1)).trim(); }
+  return v;
+}
+
+function renderKPIs(d){
+  const items = [
+    {label:'SLA compliance', val:d.sla+'%', trend:d.slaTrend, sub:'of jobs closed on time'},
+    {label:'Jobs completed', val:d.jobs, trend:d.jobsTrend, sub:'across all sites'},
+    {label:'Avg. response time', val:d.resp+'m', trend:d.respTrend, sub:'dispatch to arrival', invert:true},
+    {label:'Auto-verification rate', val:d.verifyRate+'%', trend:d.verifyTrend, sub:'proofs cleared without review'},
+  ];
+  document.getElementById('kpi-row').innerHTML = items.map(it=>{
+    const good = it.invert ? it.trend<0 : it.trend>0;
+    return `
+    <div class="kpi">
+      <div class="kpi-label"><span>${it.label}</span><span class="kpi-trend ${good?'up':'down'}">${it.trend>0?'+':''}${it.trend}${typeof it.trend==='number'&&Math.abs(it.trend)<20?'%':''}</span></div>
+      <div class="kpi-val">${it.val}</div>
+      <div class="kpi-sub">${it.sub}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTrendLiveNote(sla){
+  const svg = document.getElementById('trend-chart');
+  svg.innerHTML = `
+    <rect x="0" y="0" width="640" height="200" fill="none"/>
+    <text x="320" y="88" text-anchor="middle" font-family="Space Grotesk" font-weight="600" font-size="34" fill="#3ED9A0">${sla != null ? sla + '%' : '—'}</text>
+    <text x="320" y="112" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#8CA0B3">current SLA compliance, computed from real completed jobs right now</text>
+    <text x="320" y="150" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6C7C">This backend keeps live state, not historical snapshots —</text>
+    <text x="320" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6C7C">a real weekly trend line needs data collected over actual weeks.</text>
+  `;
+}
+
+function renderTrend(d){
+  const svg = document.getElementById('trend-chart');
+  const vals = d.trend;
+  const w=640,h=200,padL=34,padR=10,padT=16,padB=26;
+  const min = Math.min(...vals)-4, max = 100;
+  const x = i => padL + i*(w-padL-padR)/(vals.length-1);
+  const y = v => padT + (h-padT-padB)*(1-(v-min)/(max-min));
+  let grid = '';
+  [0,25,50,75,100].forEach(pct=>{
+    const v = min + (max-min)*pct/100;
+    grid += `<line x1="${padL}" y1="${y(v)}" x2="${w-padR}" y2="${y(v)}" stroke="#1A232D" stroke-width="1"/>`;
+  });
+  grid += `<line x1="${padL}" y1="${y(95)}" x2="${w-padR}" y2="${y(95)}" stroke="#4E3D1D" stroke-width="1" stroke-dasharray="4 4"/>`;
+  grid += `<text x="${w-padR}" y="${y(95)-6}" text-anchor="end" font-family="IBM Plex Mono" font-size="9" fill="#F0AC4E">95% SLA target</text>`;
+  const pts = vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+  const area = `${x(0)},${y(min)} ${pts} ${x(vals.length-1)},${y(min)}`;
+  let dots = vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.2" fill="#0B0F14" stroke="#3ED9A0" stroke-width="2"/>`).join('');
+  let labels = vals.map((v,i)=>`<text x="${x(i)}" y="${h-8}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#5C6C7C">W${i+1}</text>`).join('');
+  svg.innerHTML = `
+    <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3ED9A0" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3ED9A0" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <polygon points="${area}" fill="url(#areaGrad)"/>
+    <polyline points="${pts}" fill="none" stroke="#3ED9A0" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}${labels}
+  `;
+}
+
+function renderBars(d){
+  const svg = document.getElementById('bar-chart');
+  const items = d.bars;
+  const w=640,h=210,padL=10,padR=10,padT=10,padB=28;
+  const max = Math.max(...items.map(i=>i[1]));
+  const bw = (w-padL-padR)/items.length;
+  let bars='', labels='';
+  items.forEach((it,i)=>{
+    const bh = (h-padT-padB)*(it[1]/max);
+    const x = padL + i*bw + bw*0.18;
+    const bwid = bw*0.64;
+    const y = h-padB-bh;
+    bars += `<rect x="${x}" y="${y}" width="${bwid}" height="${bh}" rx="4" fill="#5AA9F2" opacity="0.9"/>`;
+    bars += `<text x="${x+bwid/2}" y="${y-6}" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#8CA0B3">${it[1]}</text>`;
+    labels += `<text x="${x+bwid/2}" y="${h-10}" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5C6C7C">${it[0].split(' ')[0]}</text>`;
+  });
+  svg.innerHTML = bars+labels;
+}
+
+function renderFunnel(d){
+  const items = d.funnel;
+  const max = items[0][1];
+  const colors = ['#5AA9F2','#3ED9A0','#F0AC4E','#B389E8'];
+  document.getElementById('funnel').innerHTML = items.map((it,i)=>`
+    <div class="funnel-row">
+      <div class="funnel-label">${it[0]}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${(it[1]/max*100)}%;background:${colors[i]}"></div></div>
+      <div class="funnel-val mono">${it[1]}</div>
+    </div>
+  `).join('');
+}
+
+function renderDonut(d){
+  const svg = document.getElementById('donut-chart');
+  const cx=90,cy=90,r=64,strokeW=26;
+  const circ = 2*Math.PI*r;
+  let offset = 0, paths='';
+  const colorMap = {'var(--blue)':'#5AA9F2','var(--green)':'#3ED9A0','var(--purple)':'#B389E8','var(--amber)':'#F0AC4E'};
+  d.donut.forEach(seg=>{
+    const [label,pct,colorVar] = seg;
+    const color = colorMap[colorVar] || colorVar;
+    const len = circ*(pct/100);
+    paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-dasharray="${len} ${circ-len}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    offset += len;
+  });
+  svg.innerHTML = paths + `<text x="${cx}" y="${cy-2}" text-anchor="middle" font-family="Space Grotesk" font-weight="600" font-size="19" fill="#E7EDF3">${d.jobs}</text><text x="${cx}" y="${cy+16}" text-anchor="middle" font-family="Inter" font-size="9" fill="#5C6C7C">jobs</text>`;
+
+  const colorMap2 = colorMap;
+  document.getElementById('donut-legend').innerHTML = d.donut.map(seg=>{
+    const [label,pct,colorVar] = seg;
+    const color = colorMap2[colorVar] || colorVar;
+    return `<div class="legend-item" style="margin-bottom:10px;"><span class="legend-dot" style="background:${color}"></span>${label}<span style="margin-left:auto;color:var(--text-faint)" class="mono">${pct}%</span></div>`;
+  }).join('');
+}
+
+function renderTechTable(d){
+  const colors = ['#3ED9A0','#5AA9F2','#B389E8','#F0AC4E','#E86A6A'];
+  document.getElementById('tech-table').innerHTML = d.techs.map((t,i)=>{
+    const [name,jobs,pct,speed,flags] = t;
+    return `
+    <tr>
+      <td><div class="rank-badge ${i===0?'top':''}">${i+1}</div></td>
+      <td class="name">${name}</td>
+      <td class="mono">${jobs}</td>
+      <td><div class="bar-cell"><div class="mini-track"><div class="mini-fill" style="width:${pct}%;background:${pct>=95?'#3ED9A0':pct>=88?'#5AA9F2':'#F0AC4E'}"></div></div><span class="mono">${pct}%</span></div></td>
+      <td class="mono">${speed}</td>
+      <td class="mono">${flags}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderAll(){
+  const d = DATASETS[range];
+  renderKPIs(d);
+  renderTrend(d);
+  renderBars(d);
+  renderFunnel(d);
+  renderDonut(d);
+  renderTechTable(d);
+}
+
+document.querySelectorAll('.range-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(LIVE) return; // ranges aren't meaningful against a single live snapshot
+    document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    range = parseInt(btn.dataset.r);
+    renderAll();
+  });
+});
+
+renderAll();
+
+/* ---------------- Live backend wiring ----------------
+   Paints instantly with the mock 7D/30D/90D datasets above, then tries to
+   load /v1/analytics/summary — a real aggregation over whatever's actually
+   in the database. Everything computable from real data (KPIs, the
+   verification funnel, jobs by type/industry, the technician leaderboard)
+   gets replaced with real numbers. The SLA trend chart is the one thing
+   that can't be made honestly real: this backend has no historical
+   snapshots to plot a multi-week line from, so live mode shows the current
+   compliance number plainly instead of fabricating a trend, and the
+   7D/30D/90D toggle disables itself rather than implying ranges that don't
+   apply to a single live total. */
+const API_BASE = 'http://127.0.0.1:8000';
+let LIVE = false;
+
+const INDUSTRY_COLORS = {
+  Hospitality: 'var(--green)', Retail: 'var(--blue)',
+  Healthcare: 'var(--purple)', Corporate: 'var(--amber)',
+};
+
+async function fetchJSON(url){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {signal: controller.signal});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function setConnStatus(isLive){
+  const badge = document.getElementById('conn-badge');
+  badge.classList.remove('live','offline');
+  badge.classList.add(isLive ? 'live' : 'offline');
+  document.getElementById('conn-text').textContent = isLive ? 'Live · all-time totals' : 'Demo data · backend offline';
+}
+
+async function loadLiveAnalytics(){
+  try{
+    const s = await fetchJSON(`${API_BASE}/v1/analytics/summary`);
+    LIVE = true;
+    setConnStatus(true);
+    document.getElementById('range-toggle').style.opacity = '0.4';
+    document.getElementById('range-toggle').style.pointerEvents = 'none';
+    document.getElementById('speed-col-header').textContent = 'Avg. job duration';
+
+    const d = {
+      sla: s.sla_compliance_pct ?? 0, slaTrend: 0,
+      jobs: s.jobs_done, jobsTrend: 0,
+      resp: s.avg_response_min ?? 0, respTrend: 0,
+      verifyRate: s.auto_verify_pct ?? 0, verifyTrend: 0,
+      bars: Object.entries(s.jobs_by_type),
+      funnel: [
+        ['Captured', s.captures_total], ['Auto-verified', s.captures_verified],
+        ['Flagged', s.captures_flagged_open], ['Resolved', s.captures_resolved],
+      ],
+      donut: Object.entries(s.jobs_by_industry).map(([label,count]) => [
+        label, s.jobs_total ? Math.round(count / s.jobs_total * 100) : 0,
+        INDUSTRY_COLORS[label] || 'var(--text-faint)',
+      ]),
+      techs: s.technician_leaderboard.map(t => [
+        t.name, t.jobs_done, t.ontime_pct ?? 0,
+        t.avg_duration_min != null ? t.avg_duration_min+'m' : '—',
+        t.flagged_count,
+      ]),
+    };
+
+    renderKPIs(d);
+    renderTrendLiveNote(d.sla);
+    renderBars(d);
+    renderFunnel(d);
+    renderDonut(d);
+    renderTechTable(d);
+  }catch(err){
+    LIVE = false;
+    setConnStatus(false);
+  }
+}
+loadLiveAnalytics();
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

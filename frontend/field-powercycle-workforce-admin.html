@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Workforce</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;height:100%;overflow:hidden;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  .app{display:grid;grid-template-rows:56px auto 1fr;height:100vh;width:100vw;}
+
+  /* topbar */
+  .topbar{display:flex;align-items:center;gap:22px;padding:0 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D131A,#0B0F14);}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:2px;font-family:'Inter';}
+  .ticker{display:flex;gap:26px;margin-left:8px;}
+  .tick{display:flex;flex-direction:column;gap:1px;}
+  .tick .v{font-family:'IBM Plex Mono';font-size:14px;font-weight:500;}
+  .tick .v.g{color:var(--green);} .tick .v.a{color:var(--amber);} .tick .v.r{color:var(--red);}
+  .tick .l{font-size:10px;color:var(--text-faint);letter-spacing:.3px;}
+  .topbar-right{margin-left:auto;}
+  .conn-badge{display:flex;align-items:center;gap:6px;font-size:10.5px;font-family:'IBM Plex Mono';color:var(--text-faint);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;flex-shrink:0;}
+  .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .conn-badge.live .conn-dot{background:var(--green);box-shadow:0 0 0 2px var(--green-dim);animation:connPulse 1.6s infinite;}
+  .conn-badge.live{color:var(--green);border-color:#245944;}
+  .conn-badge.offline .conn-dot{background:var(--amber);}
+  .conn-badge.offline{color:var(--amber);border-color:#4E3D1D;}
+  @keyframes connPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .add-btn{background:var(--blue);color:#06141F;border:none;font-weight:700;font-size:12.5px;padding:9px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:7px;}
+  .add-btn svg{width:14px;height:14px;}
+
+  /* expiry banner */
+  .banner{display:flex;align-items:center;gap:12px;padding:10px 20px;background:var(--amber-dim);border-bottom:1px solid #4E3D1D;font-size:12.5px;}
+  .banner svg{width:16px;height:16px;stroke:var(--amber);flex-shrink:0;}
+  .banner b{color:var(--amber);}
+  .banner-links{display:flex;gap:8px;margin-left:auto;}
+  .banner-chip{background:rgba(0,0,0,.2);border:1px solid #5C4620;color:var(--amber);font-family:'IBM Plex Mono';font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;}
+  .banner-chip:hover{background:rgba(0,0,0,.35);}
+
+  /* main split */
+  .main{display:grid;grid-template-columns:360px 1fr;overflow:hidden;}
+
+  .roster-col{border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;}
+  .roster-search{padding:12px 14px;border-bottom:1px solid var(--line);}
+  .search-box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .search-box svg{width:14px;stroke:var(--text-faint);flex-shrink:0;}
+  .search-box input{background:none;border:none;outline:none;color:var(--text);font-size:12.5px;width:100%;font-family:'Inter';}
+  .search-box input::placeholder{color:var(--text-faint);}
+  .filter-row{display:flex;gap:6px;padding:10px 14px;flex-wrap:wrap;border-bottom:1px solid var(--line);}
+  .fchip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;border:1px solid var(--line);color:var(--text-faint);cursor:pointer;}
+  .fchip.active{background:var(--blue-dim);color:var(--blue);border-color:#2A4A63;}
+
+  .roster-list{flex:1;overflow-y:auto;padding:10px;}
+  .roster-list::-webkit-scrollbar{width:8px;} .roster-list::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+  .rcard{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:7px;}
+  .rcard:hover{border-color:#33455A;}
+  .rcard.selected{border-color:var(--blue);background:#12202C;}
+  .rcard-av{width:36px;height:36px;border-radius:10px;background:#1A2530;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:600;font-size:12.5px;color:var(--text-dim);flex-shrink:0;position:relative;}
+  .status-dot{position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;border:2px solid var(--bg);}
+  .rcard-info{flex:1;min-width:0;}
+  .rcard-name{font-size:13px;font-weight:600;}
+  .rcard-role{font-size:10.5px;color:var(--text-faint);margin-top:1px;}
+  .rcard-badges{display:flex;gap:4px;margin-top:5px;}
+  .mini-badge{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;}
+  .rcard-flag{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+  /* detail panel */
+  .detail{overflow-y:auto;padding:24px 30px 60px;}
+  .detail::-webkit-scrollbar{width:8px;} .detail::-webkit-scrollbar-thumb{background:#1E2732;border-radius:8px;}
+
+  .profile-head{display:flex;align-items:flex-start;gap:16px;}
+  .profile-av{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#2C4A5E,#17222C);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:22px;color:var(--blue);flex-shrink:0;}
+  .profile-name{font-family:'Space Grotesk';font-size:22px;font-weight:600;}
+  .profile-meta{font-size:12.5px;color:var(--text-dim);margin-top:4px;}
+  .profile-status{display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:20px;}
+
+  .stat-strip{display:flex;gap:28px;margin-top:22px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .stat{}
+  .stat .v{font-family:'IBM Plex Mono';font-size:18px;font-weight:500;}
+  .stat .l{font-size:10.5px;color:var(--text-faint);margin-top:2px;}
+
+  .dsection-title{font-family:'Space Grotesk';font-size:14px;font-weight:600;margin:26px 0 13px;display:flex;align-items:center;justify-content:space-between;}
+  .dsection-title .hint{font-size:11px;color:var(--text-faint);font-weight:500;font-family:'Inter';}
+
+  .cert-table{width:100%;border-collapse:collapse;}
+  .cert-table th{text-align:left;font-size:10px;color:var(--text-faint);font-weight:600;padding:0 12px 8px;border-bottom:1px solid var(--line);letter-spacing:.2px;}
+  .cert-table td{padding:11px 12px;border-bottom:1px solid var(--line-soft);font-size:12.5px;}
+  .cert-table tr:last-child td{border-bottom:none;}
+  .cert-name{font-weight:600;display:flex;align-items:center;gap:8px;}
+  .cert-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .cert-icon svg{width:13px;height:13px;}
+  .cstatus{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+  .cstatus.valid{background:var(--green-dim);color:var(--green);}
+  .cstatus.expiring{background:var(--amber-dim);color:var(--amber);}
+  .cstatus.expired{background:var(--red-dim);color:var(--red);}
+  .cert-date{color:var(--text-dim);font-family:'IBM Plex Mono';font-size:11.5px;}
+
+  .onboard-track{display:flex;flex-direction:column;gap:0;}
+  .ostep{display:flex;align-items:flex-start;gap:12px;padding:12px 0;position:relative;}
+  .ostep::before{content:'';position:absolute;left:11px;top:34px;bottom:-12px;width:1.5px;background:var(--line);}
+  .ostep:last-child::before{display:none;}
+  .ocircle{width:24px;height:24px;border-radius:50%;background:var(--panel-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;}
+  .ocircle.done{background:var(--green);border-color:var(--green);}
+  .ocircle.done svg{width:12px;height:12px;stroke:#04140E;stroke-width:3;}
+  .ocircle.current{border-color:var(--blue);}
+  .ocircle.current .pulse{width:8px;height:8px;border-radius:50%;background:var(--blue);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .ostep-name{font-size:13px;font-weight:600;}
+  .ostep-name.pending{color:var(--text-faint);font-weight:500;}
+  .ostep-sub{font-size:11px;color:var(--text-faint);margin-top:2px;}
+
+  .equip-list{display:flex;flex-direction:column;gap:8px;}
+  .equip-row{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:10px 13px;font-size:12px;}
+  .equip-row svg{width:15px;stroke:var(--text-dim);flex-shrink:0;}
+  .equip-row .name{flex:1;}
+  .equip-row .tag{font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);}
+
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-faint);gap:10px;}
+  .empty-state svg{width:36px;stroke:var(--text-faint);}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#141C25;border:1px solid var(--green);color:var(--text);padding:11px 18px;border-radius:9px;font-size:12.5px;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:.25s;z-index:40;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast svg{width:15px;height:15px;stroke:var(--green);flex-shrink:0;}
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>Field PowerCycle<span class="sub">— Workforce</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a><div class="switcher-item current">Workforce</div><a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a><a class="switcher-item" href="field-powercycle-settings.html">Settings</a><a class="switcher-item" href="field-powercycle-billing.html">Billing</a><a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a><a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="ticker">
+      <div class="tick"><span class="v" id="stat-active">11</span><span class="l">ACTIVE TECHS</span></div>
+      <div class="tick"><span class="v a" id="stat-expiring">4</span><span class="l">CERTS EXPIRING</span></div>
+      <div class="tick"><span class="v" id="stat-onboarding">2</span><span class="l">ONBOARDING</span></div>
+      <div class="tick"><span class="v g" id="stat-compliance">91%</span><span class="l">COMPLIANCE RATE</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="conn-badge" id="conn-badge" style="margin-right:10px;"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting…</span></div>
+      <button class="add-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add technician</button>
+    </div>
+  </div>
+
+  <div class="banner" id="expiry-banner"></div>
+
+  <div class="main">
+    <div class="roster-col">
+      <div class="roster-search">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="search-input" placeholder="Search technicians…">
+        </div>
+      </div>
+      <div class="filter-row" id="filter-row">
+        <div class="fchip active" data-f="all">All (11)</div>
+        <div class="fchip" data-f="active">Active</div>
+        <div class="fchip" data-f="onboarding">Onboarding</div>
+        <div class="fchip" data-f="attention">Needs attention</div>
+      </div>
+      <div class="roster-list" id="roster-list"></div>
+    </div>
+
+    <div class="detail" id="detail"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><svg viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg><span id="toast-text"></span></div>
+
+<script>
+const CERT_ICONS = {
+  pos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>',
+  payment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+  network: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="4" r="2"/><circle cx="5" cy="20" r="2"/><circle cx="19" cy="20" r="2"/><path d="M12 6v6M12 12L6 18M12 12l6 6"/></svg>',
+  hipaa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/></svg>',
+  safety: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.7 17.1a1.6 1.6 0 001.4 2.4h15.8a1.6 1.6 0 001.4-2.4L13.7 3.9a1.6 1.6 0 00-2.8 0z"/></svg>',
+};
+const CERT_COLORS = { pos:'var(--blue)', payment:'var(--purple)', network:'var(--green)', hipaa:'var(--red)', safety:'var(--amber)' };
+
+const MOCK_TECHS = [
+  { id:'T-104', name:'Marcus Reyes', role:'Senior Field Technician', status:'active', hire:'Mar 2021', jobs:312, ontime:97, avgVerify:'8m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'Jan 2024', expires:'Jan 2027', state:'valid'},
+      {name:'Payment Device Pairing', type:'payment', issued:'Jan 2024', expires:'Jan 2027', state:'valid'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Mar 2021', expires:'Mar 2027', state:'valid'},
+    ],
+    equip:[['Fluke Cable Tester','ASSET-2291'],['Company vehicle — Van 14','VIN ending 4471'],['iPad Pro (field app)','ASSET-1108']] },
+  { id:'T-092', name:'Priya Chandran', role:'Field Technician', status:'active', hire:'Jun 2022', jobs:241, ontime:95, avgVerify:'10m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'Jun 2022', expires:'Sep 15, 2026', state:'expiring'},
+      {name:'Payment Device Pairing', type:'payment', issued:'Jun 2022', expires:'Jun 2027', state:'valid'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Jun 2022', expires:'Jun 2028', state:'valid'},
+    ],
+    equip:[['Fluke Cable Tester','ASSET-2304'],['Company vehicle — Van 09','VIN ending 8823']] },
+  { id:'T-118', name:'Dana Whitfield', role:'Senior Field Technician', status:'active', hire:'Nov 2020', jobs:389, ontime:96, avgVerify:'7m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'Nov 2020', expires:'Nov 2026', state:'valid'},
+      {name:'Structured Cabling (BICSI)', type:'network', issued:'Nov 2020', expires:'Nov 2026', state:'valid'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Nov 2020', expires:'Nov 2026', state:'valid'},
+    ],
+    equip:[['Fluke Cable Tester','ASSET-2118'],['Rack toolkit','ASSET-0977'],['Company vehicle — Van 03','VIN ending 2210']] },
+  { id:'T-071', name:'Sam Okafor', role:'Field Technician', status:'attention', hire:'Feb 2023', jobs:156, ontime:88, avgVerify:'15m',
+    certs:[
+      {name:'Structured Cabling (BICSI)', type:'network', issued:'Feb 2023', expires:'Feb 2026', state:'expired'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Feb 2023', expires:'Feb 2027', state:'valid'},
+    ],
+    equip:[['Fluke Cable Tester','ASSET-2377']] },
+  { id:'T-133', name:'Luis Fontana', role:'Field Technician', status:'active', hire:'Aug 2022', jobs:203, ontime:91, avgVerify:'12m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'Aug 2022', expires:'Sep 22, 2026', state:'expiring'},
+      {name:'Payment Device Pairing', type:'payment', issued:'Aug 2022', expires:'Aug 2027', state:'valid'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Aug 2022', expires:'Aug 2027', state:'valid'},
+    ],
+    equip:[['Company vehicle — Van 11','VIN ending 5502'],['iPad Pro (field app)','ASSET-1145']] },
+  { id:'T-059', name:'Grace Halden', role:'Senior Field Technician', status:'active', hire:'Jan 2020', jobs:441, ontime:98, avgVerify:'6m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'Jan 2020', expires:'Jan 2027', state:'valid'},
+      {name:'Payment Device Pairing', type:'payment', issued:'Jan 2020', expires:'Jan 2027', state:'valid'},
+      {name:'HIPAA Site Access', type:'hipaa', issued:'Jan 2020', expires:'Jan 2027', state:'valid'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Jan 2020', expires:'Jan 2027', state:'valid'},
+    ],
+    equip:[['Fluke Cable Tester','ASSET-2055'],['Company vehicle — Van 01','VIN ending 1190'],['iPad Pro (field app)','ASSET-1002']] },
+  { id:'T-201', name:'Ivy Torres', role:'Field Technician', status:'active', hire:'Apr 2023', jobs:118, ontime:92, avgVerify:'11m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'Apr 2023', expires:'Apr 2027', state:'valid'},
+      {name:'Payment Device Pairing', type:'payment', issued:'Apr 2023', expires:'Sep 8, 2026', state:'expiring'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Apr 2023', expires:'Apr 2027', state:'valid'},
+    ],
+    equip:[['Company vehicle — Van 17','VIN ending 3391']] },
+  { id:'T-210', name:'Owen Baptiste', role:'Field Technician (Onboarding)', status:'onboarding', hire:'Aug 2026', jobs:0, ontime:null, avgVerify:'—',
+    certs:[
+      {name:'OSHA 10 Safety', type:'safety', issued:'Aug 2026', expires:'Aug 2032', state:'valid'},
+    ],
+    equip:[['iPad Pro (field app)','ASSET-1201']],
+    onboarding:[
+      {name:'Offer accepted & background check', done:true, sub:'Cleared Aug 12, 2026'},
+      {name:'OSHA 10 safety training completed', done:true, sub:'Certified Aug 18, 2026'},
+      {name:'POS systems certification course', done:false, current:true, sub:'In progress — exam scheduled Sep 5'},
+      {name:'Payment device pairing certification', done:false, sub:'Not started'},
+      {name:'Field app + equipment provisioned', done:false, sub:'Not started'},
+      {name:'First shadow shift with senior technician', done:false, sub:'Not started'},
+      {name:'Solo dispatch eligible', done:false, sub:'Not started'},
+    ] },
+  { id:'T-214', name:'Renee Castillo', role:'Field Technician (Onboarding)', status:'onboarding', hire:'Aug 2026', jobs:0, ontime:null, avgVerify:'—',
+    certs:[
+      {name:'OSHA 10 Safety', type:'safety', issued:'Aug 2026', expires:'Aug 2032', state:'valid'},
+      {name:'POS Systems Certification', type:'pos', issued:'Aug 2026', expires:'Aug 2029', state:'valid'},
+    ],
+    equip:[],
+    onboarding:[
+      {name:'Offer accepted & background check', done:true, sub:'Cleared Aug 5, 2026'},
+      {name:'OSHA 10 safety training completed', done:true, sub:'Certified Aug 10, 2026'},
+      {name:'POS systems certification course', done:true, sub:'Certified Aug 22, 2026'},
+      {name:'Payment device pairing certification', done:false, current:true, sub:'In progress — exam scheduled Sep 2'},
+      {name:'Field app + equipment provisioned', done:false, sub:'Not started'},
+      {name:'First shadow shift with senior technician', done:false, sub:'Not started'},
+      {name:'Solo dispatch eligible', done:false, sub:'Not started'},
+    ] },
+  { id:'T-045', name:'Karl Denning', role:'Field Technician', status:'inactive', hire:'May 2019', jobs:520, ontime:94, avgVerify:'9m',
+    certs:[
+      {name:'POS Systems Certification', type:'pos', issued:'May 2019', expires:'May 2025', state:'expired'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'May 2019', expires:'May 2025', state:'expired'},
+    ],
+    equip:[] },
+  { id:'T-088', name:'Nadia Farouk', role:'Field Technician', status:'active', hire:'Sep 2021', jobs:275, ontime:93, avgVerify:'10m',
+    certs:[
+      {name:'Structured Cabling (BICSI)', type:'network', issued:'Sep 2021', expires:'Sep 2027', state:'valid'},
+      {name:'HIPAA Site Access', type:'hipaa', issued:'Sep 2021', expires:'Sep 2027', state:'valid'},
+      {name:'OSHA 10 Safety', type:'safety', issued:'Sep 2021', expires:'Sep 2027', state:'valid'},
+    ],
+    equip:[['Rack toolkit','ASSET-0988'],['Company vehicle — Van 06','VIN ending 6674']] },
+];
+
+let TECHS = MOCK_TECHS;
+
+/* ---------------- Live backend wiring ----------------
+   Paints instantly with the mock roster above, then tries to load the real
+   technicians. Certification data, status, and onboarding steps come
+   straight from the database. "Jobs completed" and "on-time rate" are
+   computed client-side from real job history (arrived_at/completed_at vs.
+   sla_deadline) rather than fabricated — with this small a seeded dataset
+   the numbers will look sparse, which is the honest outcome of that choice.
+   Equipment and hire date aren't modeled in this backend, so live
+   technicians simply omit them rather than showing invented data. */
+const API_BASE = 'http://127.0.0.1:8000';
+let LIVE = false;
+
+const CERT_NAMES = {
+  pos: 'POS Systems Certification', payment: 'Payment Device Pairing',
+  network: 'Structured Cabling (BICSI)', hipaa: 'HIPAA Site Access', safety: 'OSHA 10 Safety',
+};
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function apiTechToLocal(t, jobs){
+  const theirJobs = jobs.filter(j => j.assigned_technician_id === t.id);
+  const doneJobs = theirJobs.filter(j => j.status === 'done' && j.completed_at);
+  const onTimeJobs = doneJobs.filter(j => j.sla_deadline && j.completed_at <= j.sla_deadline);
+  const ontime = doneJobs.length ? Math.round(onTimeJobs.length / doneJobs.length * 100) : null;
+
+  const durations = doneJobs.filter(j => j.arrived_at).map(j =>
+    (new Date(j.completed_at) - new Date(j.arrived_at)) / 60000);
+  const avgDurationMin = durations.length ? Math.round(durations.reduce((a,b)=>a+b,0)/durations.length) : null;
+
+  return {
+    id: t.id, name: t.name,
+    role: t.status === 'onboarding' ? 'Field Technician (Onboarding)' : 'Field Technician',
+    status: t.status, hire: '—',
+    jobs: doneJobs.length, ontime, avgVerify: avgDurationMin != null ? `${avgDurationMin}m` : '—',
+    _avgLabel: 'AVG JOB DURATION', // real metric available; "capture → verify" isn't (verification is synchronous here)
+    certs: (t.certifications || []).map(c => ({
+      name: CERT_NAMES[c.type] || c.type, type: c.type,
+      issued: 'On file', expires: c.expires, state: c.state,
+    })),
+    equip: [],
+    onboarding: (t.onboarding_steps || []).map(o => ({name:o.name, done:o.done, current:o.current, sub:o.sub})),
+    live: true,
+  };
+}
+
+async function loadLiveTechs(){
+  try{
+    const [techs, jobs] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/technicians`),
+      fetchJSON(`${API_BASE}/v1/jobs`),
+    ]);
+    TECHS = techs.map(t => apiTechToLocal(t, jobs));
+    LIVE = true;
+    const badge = document.getElementById('conn-badge');
+    badge.classList.remove('offline'); badge.classList.add('live');
+    document.getElementById('conn-text').textContent = 'Live · connected to API';
+    renderExpiryBanner();
+    renderRoster();
+    renderDetail();
+  }catch(err){
+    if(!LIVE) TECHS = MOCK_TECHS;
+    const badge = document.getElementById('conn-badge');
+    badge.classList.remove('live'); badge.classList.add('offline');
+    document.getElementById('conn-text').textContent = 'Demo data · backend offline';
+  }
+}
+
+const STATUS_META = {
+  active:      {label:'Active',      color:'var(--green)', bg:'var(--green-dim)'},
+  onboarding:  {label:'Onboarding',  color:'var(--blue)',  bg:'var(--blue-dim)'},
+  attention:   {label:'Needs attention', color:'var(--amber)', bg:'var(--amber-dim)'},
+  inactive:    {label:'Inactive',    color:'var(--text-faint)', bg:'var(--panel-2)'},
+};
+
+let selectedId = null, activeFilter = 'all', searchTerm = '';
+
+function certState(t){
+  // worst state among certs
+  const states = t.certs.map(c=>c.state);
+  if(states.includes('expired')) return 'expired';
+  if(states.includes('expiring')) return 'expiring';
+  return 'valid';
+}
+
+function renderRoster(){
+  let list = TECHS.filter(t=>{
+    if(activeFilter==='active' && t.status!=='active') return false;
+    if(activeFilter==='onboarding' && t.status!=='onboarding') return false;
+    if(activeFilter==='attention' && !(t.status==='attention' || certState(t)!=='valid')) return false;
+    if(searchTerm && !t.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+  document.getElementById('roster-list').innerHTML = list.map(t=>{
+    const sm = STATUS_META[t.status];
+    const cs = certState(t);
+    const flagColor = cs==='expired' ? 'var(--red)' : cs==='expiring' ? 'var(--amber)' : 'transparent';
+    return `
+    <div class="rcard ${selectedId===t.id?'selected':''}" data-id="${t.id}">
+      <div class="rcard-av">${t.name.split(' ').map(n=>n[0]).join('')}
+        <div class="status-dot" style="background:${sm.color}"></div>
+      </div>
+      <div class="rcard-info">
+        <div class="rcard-name">${t.name}</div>
+        <div class="rcard-role">${t.role}</div>
+        <div class="rcard-badges">
+          ${t.certs.slice(0,4).map(c=>`<div class="mini-badge" style="background:${CERT_COLORS[c.type]}22;color:${CERT_COLORS[c.type]}">${CERT_ICONS[c.type]}</div>`).join('')}
+        </div>
+      </div>
+      ${flagColor!=='transparent' ? `<div class="rcard-flag" style="background:${flagColor}"></div>` : ''}
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.rcard').forEach(el=>{
+    el.addEventListener('click', ()=>{ selectedId = el.dataset.id; renderRoster(); renderDetail(); });
+  });
+  document.querySelector('[data-f="all"]').textContent = `All (${TECHS.length})`;
+}
+
+document.querySelectorAll('.fchip').forEach(f=>{
+  f.addEventListener('click', ()=>{
+    document.querySelectorAll('.fchip').forEach(x=>x.classList.remove('active'));
+    f.classList.add('active');
+    activeFilter = f.dataset.f;
+    renderRoster();
+  });
+});
+document.getElementById('search-input').addEventListener('input', e=>{
+  searchTerm = e.target.value; renderRoster();
+});
+
+function renderExpiryBanner(){
+  const expiring = TECHS.flatMap(t=>t.certs.filter(c=>c.state!=='valid').map(c=>({...c, tech:t.name, techId:t.id})));
+  if(expiring.length===0){ document.getElementById('expiry-banner').style.display='none'; return; }
+  const expired = expiring.filter(c=>c.state==='expired').length;
+  document.getElementById('expiry-banner').innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9L2.7 17.1a1.6 1.6 0 001.4 2.4h15.8a1.6 1.6 0 001.4-2.4L13.7 3.9a1.6 1.6 0 00-2.8 0z"/></svg>
+    <span><b>${expiring.length} certification${expiring.length>1?'s':''}</b> need attention${expired?` — <b>${expired} already expired</b>, dispatch will exclude these technicians from matching jobs until renewed`:''}.</span>
+    <div class="banner-links">
+      ${expiring.slice(0,4).map(c=>`<div class="banner-chip" data-id="${c.techId}">${c.tech.split(' ')[0]} · ${c.name.split(' ').slice(0,2).join(' ')}</div>`).join('')}
+    </div>
+  `;
+  document.querySelectorAll('.banner-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{ selectedId = chip.dataset.id; renderRoster(); renderDetail(); });
+  });
+}
+
+function renderDetail(){
+  const t = TECHS.find(x=>x.id===selectedId);
+  const wrap = document.getElementById('detail');
+  if(!t){
+    wrap.innerHTML = `<div class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Select a technician to view their profile</div>`;
+    return;
+  }
+  const sm = STATUS_META[t.status];
+
+  let html = `
+    <div class="profile-head">
+      <div class="profile-av">${t.name.split(' ').map(n=>n[0]).join('')}</div>
+      <div>
+        <div class="profile-name">${t.name}</div>
+        <div class="profile-meta">${t.id} · ${t.role} · Hired ${t.hire}</div>
+        <div class="profile-status" style="background:${sm.bg};color:${sm.color}">${sm.label}</div>
+      </div>
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat"><div class="v">${t.jobs}</div><div class="l">JOBS COMPLETED</div></div>
+      <div class="stat"><div class="v" style="color:${t.ontime>=95?'var(--green)':t.ontime>=88?'var(--text)':'var(--amber)'}">${t.ontime!==null?t.ontime+'%':'—'}</div><div class="l">ON-TIME RATE</div></div>
+      <div class="stat"><div class="v">${t.avgVerify}</div><div class="l">${t._avgLabel || 'AVG CAPTURE → VERIFY'}</div></div>
+    </div>
+  `;
+
+  if(t.status==='onboarding'){
+    html += `<div class="dsection-title">Onboarding progress <span class="hint">${t.onboarding.filter(o=>o.done).length} of ${t.onboarding.length} steps complete</span></div>
+    <div class="onboard-track">
+      ${t.onboarding.map(o=>`
+        <div class="ostep">
+          <div class="ocircle ${o.done?'done':o.current?'current':''}">${o.done?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 13l4 4L19 7"/></svg>':o.current?'<div class="pulse"></div>':''}</div>
+          <div>
+            <div class="ostep-name ${!o.done && !o.current?'pending':''}">${o.name}</div>
+            <div class="ostep-sub">${o.sub}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  html += `<div class="dsection-title">Certifications <span class="hint">Drives job matching in the assignment engine</span></div>
+  <table class="cert-table">
+    <thead><tr><th>Certification</th><th>Issued</th><th>Expires</th><th>Status</th></tr></thead>
+    <tbody>
+      ${t.certs.map(c=>`
+        <tr>
+          <td><div class="cert-name"><div class="cert-icon" style="background:${CERT_COLORS[c.type]}22;color:${CERT_COLORS[c.type]}">${CERT_ICONS[c.type]}</div>${c.name}</div></td>
+          <td class="cert-date">${c.issued}</td>
+          <td class="cert-date">${c.expires}</td>
+          <td><span class="cstatus ${c.state}">${c.state==='valid'?'Valid':c.state==='expiring'?'Expiring soon':'Expired'}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>`;
+
+  if(t.equip.length){
+    html += `<div class="dsection-title">Assigned equipment</div>
+    <div class="equip-list">
+      ${t.equip.map(e=>`
+        <div class="equip-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          <span class="name">${e[0]}</span>
+          <span class="tag mono">${e[1]}</span>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  wrap.innerHTML = html;
+}
+
+renderExpiryBanner();
+renderRoster();
+renderDetail();
+loadLiveTechs();
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

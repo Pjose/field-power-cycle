@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Assignment Scoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  .wrap{max-width:920px;margin:0 auto;padding:28px 24px 60px;}
+
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:22px;}
+  .conn-badge{display:flex;align-items:center;gap:6px;font-size:10.5px;font-family:'IBM Plex Mono';color:var(--text-faint);background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px;flex-shrink:0;}
+  .conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);}
+  .conn-badge.live .conn-dot{background:var(--green);box-shadow:0 0 0 2px var(--green-dim);animation:connPulse 1.6s infinite;}
+  .conn-badge.live{color:var(--green);border-color:#245944;}
+  .conn-badge.offline .conn-dot{background:var(--amber);}
+  .conn-badge.offline{color:var(--amber);border-color:#4E3D1D;}
+  @keyframes connPulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:14px;color:var(--text-dim);}
+  .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+
+  .ticket-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:22px;}
+  .ticket-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+  .ticket-id{font-family:'IBM Plex Mono';font-size:11px;color:var(--text-faint);}
+  .ticket-title{font-family:'Space Grotesk';font-size:20px;font-weight:600;margin-top:4px;}
+  .ticket-sub{font-size:13px;color:var(--text-dim);margin-top:4px;}
+  .sla-badge{background:var(--red-dim);border:1px solid #4E2626;color:var(--red);font-family:'IBM Plex Mono';font-size:12px;padding:7px 13px;border-radius:9px;white-space:nowrap;}
+  .req-tags{display:flex;gap:7px;margin-top:14px;flex-wrap:wrap;}
+  .req-tag{font-size:11px;background:var(--panel-2);border:1px solid var(--line);color:var(--text-dim);padding:5px 10px;border-radius:20px;}
+
+  .weights-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px 20px;margin-bottom:22px;}
+  .weights-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .weights-title{font-family:'Space Grotesk';font-size:13.5px;font-weight:600;}
+  .weights-hint{font-size:11.5px;color:var(--text-faint);}
+  .weight-row{display:grid;grid-template-columns:150px 1fr 40px;align-items:center;gap:14px;margin-bottom:12px;}
+  .weight-label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);}
+  .weight-label .swatch{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+  input[type=range]{-webkit-appearance:none;width:100%;height:5px;border-radius:5px;background:var(--panel-2);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--text);cursor:pointer;border:3px solid var(--bg);}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--text);cursor:pointer;border:3px solid var(--bg);}
+  .weight-val{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--text-dim);text-align:right;}
+  .weight-reset{margin-top:2px;background:none;border:1px solid var(--line);color:var(--text-faint);font-size:11px;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:'Inter';}
+  .weight-reset:hover{color:var(--text-dim);border-color:#33455A;}
+
+  .section-label{font-family:'Space Grotesk';font-size:13px;font-weight:600;color:var(--text-dim);margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;}
+
+  .candidates{display:flex;flex-direction:column;gap:10px;}
+  .cand{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;transition:.2s;}
+  .cand.top{border-color:var(--green);background:#0F1D19;}
+  .cand-top{display:flex;align-items:center;gap:12px;}
+  .rank{width:24px;height:24px;border-radius:7px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:11px;color:var(--text-faint);flex-shrink:0;}
+  .cand.top .rank{background:var(--green);color:#04140E;font-weight:700;}
+  .cand-av{width:38px;height:38px;border-radius:10px;background:#1A2530;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:600;font-size:12.5px;color:var(--text-dim);flex-shrink:0;}
+  .cand-info{flex:1;min-width:0;}
+  .cand-name{font-size:14.5px;font-weight:600;}
+  .cand-meta{font-size:11.5px;color:var(--text-faint);margin-top:1px;}
+  .cand-score{text-align:right;flex-shrink:0;}
+  .cand-score .num{font-family:'IBM Plex Mono';font-size:20px;font-weight:500;}
+  .cand-score .lbl{font-size:9.5px;color:var(--text-faint);letter-spacing:.3px;}
+  .recommend-tag{background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;margin-left:8px;letter-spacing:.2px;}
+
+  .breakdown{display:flex;flex-direction:column;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft);}
+  .bd-row{display:grid;grid-template-columns:120px 1fr 42px;align-items:center;gap:10px;}
+  .bd-label{font-size:11px;color:var(--text-faint);}
+  .bd-track{height:6px;background:var(--panel-2);border-radius:6px;overflow:hidden;}
+  .bd-fill{height:100%;border-radius:6px;transition:width .3s ease;}
+  .bd-val{font-family:'IBM Plex Mono';font-size:10.5px;color:var(--text-dim);text-align:right;}
+
+  .cand-footer{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
+  .cand-note{font-size:11px;color:var(--text-faint);}
+  .assign-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--text-dim);font-family:'Inter';font-weight:600;font-size:12px;padding:8px 14px;border-radius:8px;cursor:pointer;}
+  .assign-btn:hover{border-color:#33455A;color:var(--text);}
+  .assign-btn.chosen{background:var(--green);border-color:var(--green);color:#04140E;}
+
+  .footnote{margin-top:24px;font-size:11.5px;color:var(--text-faint);line-height:1.7;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .footnote b{color:var(--text-dim);}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--green);color:var(--text);padding:11px 18px;border-radius:9px;font-size:12.5px;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:.25s;box-shadow:0 8px 30px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast svg{width:15px;height:15px;stroke:var(--green);flex-shrink:0;}
+
+  /* app switcher */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;font-family:'Inter',sans-serif;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;font-family:'Inter',sans-serif;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item.current:hover{background:var(--blue-dim);}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><span class="dot"></span>Field PowerCycle — Assignment Engine</div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <a class="switcher-item" href="field-powercycle-overview.html">Overview</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a><a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a><a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a><a class="switcher-item" href="field-powercycle-settings.html">Settings</a><a class="switcher-item" href="field-powercycle-billing.html">Billing</a><a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a><div class="switcher-item current">Assignment Scoring</div>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a><a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+    <div class="conn-badge" id="conn-badge" style="margin-left:auto;"><span class="conn-dot" id="conn-dot"></span><span id="conn-text">Connecting…</span></div>
+  </div>
+
+  <div class="ticket-card">
+    <div class="ticket-top">
+      <div>
+        <div class="ticket-id mono">JB-4478 · UNASSIGNED</div>
+        <div class="ticket-title">Self-Checkout Kiosk Setup — Union Square Retail #7</div>
+        <div class="ticket-sub">4 kiosks, payment terminal linking, staff walkthrough required</div>
+      </div>
+      <div class="sla-badge mono">SLA breached 4m ago</div>
+    </div>
+    <div class="req-tags">
+      <div class="req-tag">Requires: POS certification</div>
+      <div class="req-tag">Requires: Payment device pairing</div>
+      <div class="req-tag">Site: Retail, standard access</div>
+    </div>
+  </div>
+
+  <div class="weights-card">
+    <div class="weights-head">
+      <div class="weights-title">Scoring weights</div>
+      <button class="weight-reset" id="reset-weights">Reset to default</button>
+    </div>
+    <div class="weights-hint" style="margin-bottom:14px;">Drag to see how the ranking below changes. Dispatchers can tune these per ticket type — a break-fix ticket usually weights proximity higher, an install weights certification and load more evenly.</div>
+    <div id="weight-rows"></div>
+  </div>
+
+  <div class="section-label">Ranked candidates</div>
+  <div class="candidates" id="candidates"></div>
+
+  <div class="footnote">
+    <b>How this score is built.</b> Each component is normalized 0–1 before weighting, so a technician 2 minutes away doesn't automatically dominate one who's the only certified match. <b>Proximity</b> comes from live GPS + current route ETA, not straight-line distance. <b>Certification match</b> is binary-gated first — an uncertified technician is excluded from the list entirely, not just scored lower, since a payment-terminal job shouldn't go to someone without that credential regardless of how close they are. <b>Current load</b> reflects how full the rest of their day already is. <b>SLA headroom</b> checks whether taking this job would put their <em>existing</em> assignments at risk of breaching, not just whether this new ticket makes it in time.
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+  <span id="toast-text"></span>
+</div>
+
+<script>
+const WEIGHTS_DEFAULT = { proximity: 0.35, certification_match: 0.25, current_load: 0.20, sla_headroom: 0.20 };
+let weights = {...WEIGHTS_DEFAULT};
+
+const WEIGHT_META = {
+  proximity:            { label:'Proximity / ETA',        color:'var(--blue)' },
+  certification_match:  { label:'Certification match',    color:'var(--purple)' },
+  current_load:         { label:'Current load',           color:'var(--amber)' },
+  sla_headroom:         { label:'SLA headroom',            color:'var(--green)' },
+};
+
+const MOCK_CANDIDATES = [
+  { id:'T-201', name:'Ivy Torres', init:'IT', eta:14, certified:true,
+    raw:{ proximity:0.91, certification_match:1.0, current_load:0.68, sla_headroom:0.78 },
+    note:'Wrapping up a nearby install, POS-certified, light afternoon load.' },
+  { id:'T-133', name:'Luis Fontana', init:'LF', eta:9, certified:true,
+    raw:{ proximity:0.97, certification_match:1.0, current_load:0.41, sla_headroom:0.55 },
+    note:'Closest technician, but already carrying two jobs with tight SLAs today.' },
+  { id:'T-059', name:'Grace Halden', init:'GH', eta:26, certified:true,
+    raw:{ proximity:0.52, certification_match:1.0, current_load:0.88, sla_headroom:0.92 },
+    note:'Just closed out her last job — full afternoon open, but further away.' },
+  { id:'T-071', name:'Sam Okafor', init:'SO', eta:11, certified:false,
+    raw:{ proximity:0.94, certification_match:0.0, current_load:0.95, sla_headroom:0.90 },
+    note:'Closest and free all day, but not POS-certified — excluded regardless of score.' },
+];
+
+let CANDIDATES = MOCK_CANDIDATES;
+
+/* ---------------- Live backend wiring ----------------
+   Paints instantly with the mock candidates above, then tries to load a
+   real unassigned job's real candidates from the backend. computeScore()
+   below is the exact same weighted-sum formula the backend's scoring
+   engine uses — sliders re-rank purely client-side against real component
+   values, so there's no network round-trip per drag, but the numbers being
+   weighted are real distances, real current loads, and a real
+   certification gate. "Assign" calls the real assignment endpoint. */
+const API_BASE = 'http://127.0.0.1:8000';
+const LIVE_JOB_ID = 'JB-4480';
+let LIVE = false;
+
+async function fetchJSON(url, opts={}){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), 2500);
+  try{
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+function setConnStatus(isLive){
+  const badge = document.getElementById('conn-badge');
+  if(!badge) return;
+  const text = document.getElementById('conn-text');
+  badge.classList.remove('live','offline');
+  badge.classList.add(isLive ? 'live' : 'offline');
+  text.textContent = isLive ? 'Live · connected to API' : 'Demo data · backend offline';
+}
+
+function noteFor(c){
+  if(!c.eligible){
+    return `${c.distance_m < 1000 ? Math.round(c.distance_m)+'m' : (c.distance_m/1000).toFixed(1)+'km'} away and available, but missing ${c.required_cert} certification — excluded regardless of score.`;
+  }
+  const dist = c.distance_m < 1000 ? `${Math.round(c.distance_m)}m away` : `${(c.distance_m/1000).toFixed(1)}km away`;
+  const load = c.components.current_load < 0.5 ? 'already carrying an active job' : 'light load right now';
+  return `${dist}, ${load}.`;
+}
+
+async function loadLiveCandidates(){
+  try{
+    const [job, res] = await Promise.all([
+      fetchJSON(`${API_BASE}/v1/jobs/${LIVE_JOB_ID}`),
+      fetchJSON(`${API_BASE}/v1/jobs/${LIVE_JOB_ID}/candidates`),
+    ]);
+    const titleEl = document.querySelector('.ticket-title');
+    const idEl = document.querySelector('.ticket-id');
+    const subEl = document.querySelector('.ticket-sub');
+    if(titleEl) titleEl.textContent = `${job.job_type} — ${job.site.name}`;
+    if(idEl) idEl.textContent = `${job.id} · UNASSIGNED`;
+    if(subEl) subEl.textContent = `${job.sla_tier.toUpperCase()} tier · live from the assignment engine`;
+
+    CANDIDATES = res.candidates.map(c => ({
+      id: c.technician_id, name: c.name,
+      init: c.name.split(' ').map(n=>n[0]).join(''),
+      eta: c.eta_min, certified: c.eligible,
+      distance_m: c.distance_m, required_cert: c.required_cert,
+      raw: c.components,
+      note: noteFor(c),
+    }));
+    LIVE = true;
+    setConnStatus(true);
+    renderCandidates();
+  }catch(err){
+    if(!LIVE) CANDIDATES = MOCK_CANDIDATES;
+    setConnStatus(false);
+  }
+}
+
+function computeScore(c){
+  let s = 0;
+  for(const k in weights) s += weights[k]*c.raw[k];
+  return s;
+}
+
+function renderWeights(){
+  const wrap = document.getElementById('weight-rows');
+  wrap.innerHTML = Object.keys(weights).map(k=>`
+    <div class="weight-row">
+      <div class="weight-label"><span class="swatch" style="background:${WEIGHT_META[k].color}"></span>${WEIGHT_META[k].label}</div>
+      <input type="range" min="0" max="60" value="${Math.round(weights[k]*100)}" data-key="${k}">
+      <div class="weight-val mono" id="wv-${k}">${Math.round(weights[k]*100)}%</div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('input[type=range]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      weights[inp.dataset.key] = inp.value/100;
+      document.getElementById('wv-'+inp.dataset.key).textContent = inp.value+'%';
+      renderCandidates();
+    });
+  });
+}
+
+let chosenId = null;
+
+function renderCandidates(){
+  const eligible = CANDIDATES.filter(c=>c.certified);
+  const excluded = CANDIDATES.filter(c=>!c.certified);
+  const scored = eligible.map(c=>({...c, score: computeScore(c)})).sort((a,b)=>b.score-a.score);
+  const all = [...scored, ...excluded.map(c=>({...c, score:null}))];
+
+  const wrap = document.getElementById('candidates');
+  wrap.innerHTML = all.map((c,i)=>{
+    const isTop = c.score!==null && i===0;
+    return `
+    <div class="cand ${isTop?'top':''}">
+      <div class="cand-top">
+        <div class="rank mono">${c.score!==null ? '#'+(i+1) : '—'}</div>
+        <div class="cand-av">${c.init}</div>
+        <div class="cand-info">
+          <div class="cand-name">${c.name}${isTop?'<span class="recommend-tag">RECOMMENDED</span>':''}${!c.certified?'<span class="recommend-tag" style="background:var(--red-dim);color:var(--red)">NOT CERTIFIED</span>':''}</div>
+          <div class="cand-meta">${c.id} · ETA ${c.eta} min</div>
+        </div>
+        <div class="cand-score">
+          <div class="num mono" style="color:${c.score!==null?'inherit':'var(--text-faint)'}">${c.score!==null ? c.score.toFixed(2) : '—'}</div>
+          <div class="lbl">SCORE</div>
+        </div>
+      </div>
+      ${c.score!==null ? `
+      <div class="breakdown">
+        ${Object.keys(weights).map(k=>`
+          <div class="bd-row">
+            <div class="bd-label">${WEIGHT_META[k].label}</div>
+            <div class="bd-track"><div class="bd-fill" style="width:${c.raw[k]*100}%;background:${WEIGHT_META[k].color}"></div></div>
+            <div class="bd-val">${c.raw[k].toFixed(2)}</div>
+          </div>
+        `).join('')}
+      </div>` : ''}
+      <div class="cand-footer">
+        <div class="cand-note">${c.note}</div>
+        ${c.certified ? `<button class="assign-btn ${chosenId===c.id?'chosen':''}" data-id="${c.id}" data-name="${c.name}">${chosenId===c.id?'Assigned ✓':'Assign'}</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.assign-btn').forEach(btn=>{
+    btn.addEventListener('click', async e=>{
+      const id = e.currentTarget.dataset.id;
+      const name = e.currentTarget.dataset.name;
+      if(LIVE){
+        try{
+          const topScoreId = CANDIDATES.filter(c=>c.certified).slice().sort((a,b)=>computeScore(b)-computeScore(a))[0]?.id;
+          await fetchJSON(`${API_BASE}/v1/jobs/${LIVE_JOB_ID}/assign`, {method:'POST', body:{
+            technician_id: id, assigned_by: 'dispatcher:D-Vance', override_score: id !== topScoreId,
+          }});
+        }catch(err){
+          showToast('Could not reach backend — is it running on :8000?');
+          return;
+        }
+      }
+      chosenId = id;
+      renderCandidates();
+      showToast(`${name} assigned to ${LIVE ? LIVE_JOB_ID : 'JB-4478'} · dispatch notified`);
+    });
+  });
+}
+
+document.getElementById('reset-weights').addEventListener('click', ()=>{
+  weights = {...WEIGHTS_DEFAULT};
+  renderWeights();
+  renderCandidates();
+});
+
+let toastTimer;
+function showToast(text){
+  clearTimeout(toastTimer);
+  document.getElementById('toast-text').textContent = text;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+renderWeights();
+renderCandidates();
+loadLiveCandidates();
+</script>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>

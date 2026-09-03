@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field PowerCycle · Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#111820; --panel-2:#141C25; --line:#232E3A; --line-soft:#1A232D;
+    --text:#E7EDF3; --text-dim:#8CA0B3; --text-faint:#5C6C7C;
+    --green:#3ED9A0; --green-dim:#1D4E42; --amber:#F0AC4E; --amber-dim:#4E3D1D;
+    --blue:#5AA9F2; --blue-dim:#1D3A4E; --red:#E86A6A; --red-dim:#4E1D1D;
+    --purple:#B389E8; --purple-dim:#332157;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  a{color:inherit;text-decoration:none;}
+  ::selection{background:var(--blue);color:#06141F;}
+
+  /* app switcher (shared component) */
+  .app-switcher{position:relative;}
+  .switcher-btn{width:34px;height:34px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-dim);cursor:pointer;flex-shrink:0;}
+  .switcher-btn svg{width:15px;}
+  .switcher-btn:hover{color:var(--text);border-color:#33455A;}
+  .switcher-btn.open{color:var(--blue);border-color:#2A4A63;background:var(--blue-dim);}
+  .switcher-menu{position:absolute;top:42px;left:0;width:236px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.55);z-index:200;display:none;}
+  .switcher-menu.open{display:block;}
+  .switcher-label{font-size:9.5px;color:var(--text-faint);font-weight:700;letter-spacing:.4px;padding:8px 10px 6px;text-transform:uppercase;}
+  .switcher-item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text-dim);text-decoration:none;cursor:pointer;}
+  .switcher-item:hover{background:var(--panel-2);color:var(--text);}
+  .switcher-item.current{background:var(--blue-dim);color:var(--blue);font-weight:600;cursor:default;}
+  .switcher-item .ext{font-size:10px;color:var(--text-faint);}
+  .switcher-divider{height:1px;background:var(--line);margin:6px 4px;}
+
+  .topbar{display:flex;align-items:center;gap:14px;padding:0 20px;height:56px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0D131A,#0B0F14);position:sticky;top:0;z-index:50;}
+  .brand{display:flex;align-items:center;gap:9px;font-family:'Space Grotesk';font-weight:700;font-size:15px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-dim);}
+  .brand .sub{color:var(--text-faint);font-weight:500;font-size:12px;margin-left:2px;font-family:'Inter';}
+
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px 80px;}
+
+  /* hero */
+  .hero{padding:56px 0 40px;border-bottom:1px solid var(--line);}
+  .hero-eyebrow{font-family:'IBM Plex Mono';font-size:11.5px;color:var(--blue);letter-spacing:.3px;}
+  .hero-title{font-family:'Space Grotesk';font-size:36px;font-weight:600;margin-top:12px;max-width:680px;line-height:1.15;}
+  .hero-sub{font-size:14.5px;color:var(--text-dim);margin-top:16px;max-width:640px;line-height:1.6;}
+  .hero-stats{display:flex;gap:36px;margin-top:32px;flex-wrap:wrap;}
+  .hstat .v{font-family:'Space Grotesk';font-size:24px;font-weight:600;}
+  .hstat .l{font-size:11px;color:var(--text-faint);margin-top:3px;}
+
+  /* flow */
+  .flow-section{padding:40px 0;border-bottom:1px solid var(--line);}
+  .flow-title{font-family:'Space Grotesk';font-size:14px;font-weight:600;color:var(--text-dim);margin-bottom:20px;}
+  .flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:8px;}
+  .flow-step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;min-width:180px;flex-shrink:0;}
+  .flow-step .n{font-family:'IBM Plex Mono';font-size:10px;color:var(--text-faint);}
+  .flow-step .t{font-family:'Space Grotesk';font-size:13px;font-weight:600;margin-top:6px;}
+  .flow-step .d{font-size:11px;color:var(--text-faint);margin-top:6px;line-height:1.5;}
+  .flow-arrow{display:flex;align-items:center;padding:0 10px;color:var(--text-faint);flex-shrink:0;}
+  .flow-arrow svg{width:18px;}
+
+  /* persona sections */
+  .persona-section{padding:36px 0;border-bottom:1px solid var(--line);}
+  .persona-head{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .persona-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .persona-icon svg{width:17px;}
+  .persona-title{font-family:'Space Grotesk';font-size:16px;font-weight:600;}
+  .persona-sub{font-size:12px;color:var(--text-faint);margin-top:2px;}
+
+  .card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  .tool-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:17px 19px;transition:.15s;display:block;}
+  .tool-card:hover{border-color:#33455A;background:var(--panel-2);transform:translateY(-1px);}
+  .tool-card-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .tool-name{font-family:'Space Grotesk';font-size:14px;font-weight:600;}
+  .tool-format{font-size:9.5px;font-family:'IBM Plex Mono';color:var(--text-faint);border:1px solid var(--line);padding:2px 7px;border-radius:20px;flex-shrink:0;}
+  .tool-desc{font-size:12px;color:var(--text-dim);margin-top:8px;line-height:1.55;}
+  .tool-open{font-size:11px;color:var(--blue);margin-top:12px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .tool-open svg{width:11px;}
+
+  /* docs */
+  .docs-section{padding:36px 0;}
+  .docs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .doc-card{background:var(--panel-2);border:1px dashed var(--line);border-radius:12px;padding:16px 18px;display:block;}
+  .doc-card:hover{border-color:#33455A;border-style:solid;}
+  .doc-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .doc-name svg{width:14px;stroke:var(--text-faint);flex-shrink:0;}
+  .doc-desc{font-size:11px;color:var(--text-faint);margin-top:7px;line-height:1.5;}
+
+  .footer-note{padding:30px 0 10px;font-size:11.5px;color:var(--text-faint);text-align:center;line-height:1.7;}
+
+  @media (max-width:720px){
+    .card-grid,.docs-grid{grid-template-columns:1fr;}
+    .hero-title{font-size:27px;}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>Field PowerCycle<span class="sub">— Overview</span></div>
+    <div class="app-switcher" id="app-switcher">
+      <button class="switcher-btn" id="switcher-btn" title="Switch tool" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <div class="switcher-menu" id="switcher-menu">
+        <div class="switcher-item current">Overview</div>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Field PowerCycle — Ops Suite</div>
+        <a class="switcher-item" href="field-powercycle-dispatch-console.html">Dispatch Console</a>
+        <a class="switcher-item" href="field-powercycle-workforce-admin.html">Workforce</a>
+        <a class="switcher-item" href="field-powercycle-notifications.html">Notifications</a>
+        <a class="switcher-item" href="field-powercycle-settings.html">Settings</a>
+        <a class="switcher-item" href="field-powercycle-billing.html">Billing</a>
+        <a class="switcher-item" href="field-powercycle-analytics-dashboard.html">Analytics</a>
+        <a class="switcher-item" href="field-powercycle-assignment-scoring.html">Assignment Scoring</a>
+        <div class="switcher-divider"></div>
+        <div class="switcher-label">Client-facing</div>
+        <a class="switcher-item" href="field-powercycle-client-portal.html">Client Portal<span class="ext">↗</span></a>
+        <a class="switcher-item" href="field-powercycle-technician-capture.html">Technician App<span class="ext">↗</span></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-eyebrow mono">PROTOTYPE SUITE · BUILT FOR POWERCYCLE360</div>
+      <div class="hero-title">A visual-first field service platform — real-time GPS dispatch, and photo/video proof-of-work that replaces paperwork.</div>
+      <div class="hero-sub">Twelve connected pieces covering four people: the dispatcher routing technicians, the technician capturing verified proof in the field, the client watching their job happen live, and the admin running certifications, SLAs, and billing behind it all.</div>
+      <div class="hero-stats">
+        <div class="hstat"><div class="v">12</div><div class="l">ARTIFACTS</div></div>
+        <div class="hstat"><div class="v">4</div><div class="l">PERSONAS COVERED</div></div>
+        <div class="hstat"><div class="v">0</div><div class="l">PAPER FORMS</div></div>
+      </div>
+    </div>
+
+    <div class="flow-section">
+      <div class="flow-title">How a job actually moves through the system</div>
+      <div class="flow">
+        <div class="flow-step"><div class="n mono">01</div><div class="t">Ticket created</div><div class="d">Dispatcher sees it in the queue, assignment engine scores eligible technicians</div></div>
+        <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="flow-step"><div class="n mono">02</div><div class="t">Technician dispatched</div><div class="d">Live GPS tracked, client sees ETA live in their portal</div></div>
+        <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="flow-step"><div class="n mono">03</div><div class="t">Proof captured on site</div><div class="d">Photo/video signed with GPS + timestamp at the moment of capture</div></div>
+        <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="flow-step"><div class="n mono">04</div><div class="t">Auto-verified or flagged</div><div class="d">Clean captures close the checklist; edge cases go to dispatcher review</div></div>
+        <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="flow-step"><div class="n mono">05</div><div class="t">Job closes</div><div class="d">Completion report and invoice both auto-draft from the same verified data</div></div>
+      </div>
+    </div>
+
+    <!-- DISPATCHER -->
+    <div class="persona-section">
+      <div class="persona-head">
+        <div class="persona-icon" style="background:var(--blue-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.8"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><path d="M9 7v13M15 4v13"/></svg></div>
+        <div><div class="persona-title">Dispatcher &amp; operations</div><div class="persona-sub">Routes technicians, resolves edge cases, watches the numbers</div></div>
+      </div>
+      <div class="card-grid">
+        <a class="tool-card" href="field-powercycle-dispatch-console.html">
+          <div class="tool-card-top"><div class="tool-name">Dispatch Console</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">Live map with GPS-tracked technicians, job queue with SLA countdowns, and a review queue for flagged proof-of-work.</div>
+          <div class="tool-open">Open console <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+        <a class="tool-card" href="field-powercycle-assignment-scoring.html">
+          <div class="tool-card-top"><div class="tool-name">Assignment Scoring</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">Interactive walkthrough of how a new ticket gets ranked across candidate technicians — drag the weights and watch it re-rank.</div>
+          <div class="tool-open">Open tool <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+        <a class="tool-card" href="field-powercycle-analytics-dashboard.html">
+          <div class="tool-card-top"><div class="tool-name">Analytics Dashboard</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">SLA compliance trend, verification funnel, jobs by type/industry, and a technician leaderboard — 7D/30D/90D toggle.</div>
+          <div class="tool-open">Open dashboard <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+        <a class="tool-card" href="field-powercycle-notifications.html">
+          <div class="tool-card-top"><div class="tool-name">Notification Center</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">Rules engine for every SMS/push/email/console alert in the system, with live channel previews and a delivery feed.</div>
+          <div class="tool-open">Open center <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+      </div>
+    </div>
+
+    <!-- TECHNICIAN -->
+    <div class="persona-section">
+      <div class="persona-head">
+        <div class="persona-icon" style="background:var(--green-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg></div>
+        <div><div class="persona-title">Field technician</div><div class="persona-sub">Captures proof on site, no paperwork at the end of a job</div></div>
+      </div>
+      <div class="card-grid">
+        <a class="tool-card" href="field-powercycle-technician-capture.html">
+          <div class="tool-card-top"><div class="tool-name">Technician Capture App</div><div class="tool-format">HTML · Mobile</div></div>
+          <div class="tool-desc">Camera capture bound to GPS + timestamp at the moment of the shutter, auto-verifying checklist items, offline queueing.</div>
+          <div class="tool-open">Open app <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+        <a class="tool-card" href="field-powercycle-workforce-admin.html">
+          <div class="tool-card-top"><div class="tool-name">Workforce &amp; Certifications</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">Where the certification data behind assignment eligibility actually lives, plus a step-by-step onboarding tracker for new hires.</div>
+          <div class="tool-open">Open roster <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+      </div>
+    </div>
+
+    <!-- CLIENT -->
+    <div class="persona-section">
+      <div class="persona-head">
+        <div class="persona-icon" style="background:var(--purple-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M9 13h1M14 9h1M14 13h1"/></svg></div>
+        <div><div class="persona-title">Client</div><div class="persona-sub">Watches their own job happen instead of calling to check</div></div>
+      </div>
+      <div class="card-grid">
+        <a class="tool-card" href="field-powercycle-client-portal.html">
+          <div class="tool-card-top"><div class="tool-name">Client Portal</div><div class="tool-format">HTML · Light theme</div></div>
+          <div class="tool-desc">Live technician tracking with ETA, ticket history with verified completion reports, and a locations overview across sites.</div>
+          <div class="tool-open">Open portal <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+        <a class="tool-card" href="field-powercycle-completion-report-JB-4469.pdf">
+          <div class="tool-card-top"><div class="tool-name">Completion Report (sample)</div><div class="tool-format">PDF</div></div>
+          <div class="tool-desc">The static export a client can download — checklist, timestamped proof, and an audit trail with an integrity hash.</div>
+          <div class="tool-open">Open PDF <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div class="persona-section">
+      <div class="persona-head">
+        <div class="persona-icon" style="background:var(--amber-dim)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg></div>
+        <div><div class="persona-title">Admin / operations lead</div><div class="persona-sub">Configures the numbers everything else quietly depends on</div></div>
+      </div>
+      <div class="card-grid">
+        <a class="tool-card" href="field-powercycle-settings.html">
+          <div class="tool-card-top"><div class="tool-name">Settings</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">SLA tiers, geofence radii and per-site overrides, business hours, client accounts, and connected integrations.</div>
+          <div class="tool-open">Open settings <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+        <a class="tool-card" href="field-powercycle-billing.html">
+          <div class="tool-card-top"><div class="tool-name">Billing</div><div class="tool-format">HTML</div></div>
+          <div class="tool-desc">Invoices auto-drafted from verified job data — labor hours pulled from arrival/completion timestamps, not self-reported.</div>
+          <div class="tool-open">Open billing <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="docs-section">
+      <div class="persona-head" style="margin-bottom:14px;">
+        <div class="persona-icon" style="background:var(--panel-2);border:1px solid var(--line)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></div>
+        <div><div class="persona-title">Reference documentation</div><div class="persona-sub">How it's actually built underneath</div></div>
+      </div>
+      <div class="docs-grid">
+        <a class="doc-card" href="field-powercycle-architecture.md">
+          <div class="doc-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Architecture</div>
+          <div class="doc-desc">Five services — location ingestion, dispatch, media ingestion, verification engine, audit ledger — and how they fit together.</div>
+        </a>
+        <a class="doc-card" href="field-powercycle-api-contract.md">
+          <div class="doc-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-3M14 3h7v7M14 10L21 3"/></svg>API Contract</div>
+          <div class="doc-desc">Actual endpoints and payloads — location pings, capture verification, review queue, scoring, and the notification rule catalog.</div>
+        </a>
+        <div class="doc-card" style="opacity:.6;">
+          <div class="doc-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>What's not built yet</div>
+          <div class="doc-desc">Payment processing is flagged "Not connected" in Settings on purpose — real invoicing/payments integration is scoped but not built.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">All data across these twelve pieces is illustrative sample data built for this preview — job IDs, technician names, and figures are consistent across tools but not connected to a real backend.</div>
+  </div>
+
+<script>
+(function(){
+  var btn = document.getElementById('switcher-btn');
+  var menu = document.getElementById('switcher-menu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    menu.classList.toggle('open');
+    btn.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.contains(e.target) && e.target!==btn){
+      menu.classList.remove('open');
+      btn.classList.remove('open');
+    }
+  });
+})();
+</script>
+</body>
+</html>
