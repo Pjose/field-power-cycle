@@ -8,28 +8,28 @@ This describes what sits behind the two prototypes: the dispatch console and the
 ## 1. High-level shape
 
 ```
-┌────────────────┐      ┌──────────────────┐      ┌───────────────────┐
-│  Technician app │◄────►│   API / Realtime  │◄────►│  Dispatch console  │
-│  (iOS/Android)  │      │      layer        │      │   (web)            │
-└───────┬─────────┘      └─────────┬─────────┘      └────────────────────┘
-        │ GPS pings, media              │
-        │ capture, offline queue        │
+┌─────────────────┐          ┌───────────────────┐      ┌────────────────────┐
+│  Technician app │◄────────►│   API / Realtime  │◄────►│  Dispatch console  │
+│  (iOS/Android)  │          │      layer        │      │   (web)            │
+└───────┬─────────┘          └─────────┬─────────┘      └────────────────────┘
+        │ GPS pings, media             │
+        │ capture, offline queue       │
         ▼                              ▼
-┌────────────────┐            ┌──────────────────┐
-│  Location       │            │  Job / dispatch   │
+┌─────────────────┐            ┌────────────────────┐
+│  Location       │            │  Job / dispatch    │
 │  ingestion      │            │  service           │
 └───────┬─────────┘            └─────────┬──────────┘
         │                                │
         ▼                                ▼
-┌────────────────┐            ┌──────────────────┐
+┌─────────────────┐            ┌────────────────────┐
 │  Media          │            │  Verification      │
-│  ingestion +    │───────────►│  engine             │
+│  ingestion +    │───────────►│  engine            │
 │  object storage │            └─────────┬──────────┘
-└────────────────┘                       ▼
-                                ┌──────────────────┐
+└─────────────────┘                      ▼
+                                ┌────────────────────┐
                                 │  Audit / evidence  │
-                                │  ledger             │
-                                └──────────────────┘
+                                │  ledger            │
+                                └────────────────────┘
 ```
 
 Five services do the real work: **location ingestion**, **job/dispatch**, **media ingestion**, **verification engine**, and an **audit ledger** that's append-only by design, because proof-of-work is only worth something if it can't quietly be edited later.
