@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
 from ..audit import log_event
+from ..auth import require_roles, actor_label
 
 router = APIRouter(tags=["review"])
 
 
 @router.get("/v1/review-queue")
-def review_queue(status: str = "open", db: Session = Depends(get_db)):
+def review_queue(status: str = "open", user: models.User = Depends(require_roles("admin", "dispatcher")),
+                  db: Session = Depends(get_db)):
     q = db.query(models.Capture)
     if status == "open":
         q = q.filter(models.Capture.status == "flagged")
@@ -29,7 +31,9 @@ def review_queue(status: str = "open", db: Session = Depends(get_db)):
 
 
 @router.post("/v1/captures/{capture_id}/resolve")
-def resolve_capture(capture_id: str, body: schemas.ReviewResolveIn, db: Session = Depends(get_db)):
+def resolve_capture(capture_id: str, body: schemas.ReviewResolveIn,
+                     user: models.User = Depends(require_roles("admin", "dispatcher")),
+                     db: Session = Depends(get_db)):
     capture = db.get(models.Capture, capture_id)
     if not capture:
         raise HTTPException(404, "capture not found")
@@ -39,7 +43,7 @@ def resolve_capture(capture_id: str, body: schemas.ReviewResolveIn, db: Session 
         raise HTTPException(400, "resolution must be 'approved' or 'rejected'")
 
     capture.status = f"resolved_{body.resolution}"
-    log_event(db, "capture_resolved", "capture", capture.id, actor=body.resolved_by,
+    log_event(db, "capture_resolved", "capture", capture.id, actor=actor_label(user),
               payload={"resolution": body.resolution, "note": body.note})
 
     if body.resolution == "approved" and capture.checklist_item_id:
@@ -48,13 +52,13 @@ def resolve_capture(capture_id: str, body: schemas.ReviewResolveIn, db: Session 
             item.satisfied_by_capture_id = capture.id
             item.completed_at = dt.datetime.utcnow()
             log_event(db, "checklist_item_satisfied", "checklist_item", item.id,
-                       actor=body.resolved_by, payload={"capture_id": capture.id, "via": "dispatcher_approval"})
+                       actor=actor_label(user), payload={"capture_id": capture.id, "via": "dispatcher_approval"})
             job = capture.job
             remaining = [c for c in job.checklist_items if not c.satisfied_by_capture_id]
             if not remaining and job.status != "done":
                 job.status = "done"
                 job.completed_at = dt.datetime.utcnow()
-                log_event(db, "job_completed", "job", job.id, actor=body.resolved_by, payload={})
+                log_event(db, "job_completed", "job", job.id, actor=actor_label(user), payload={})
     elif body.resolution == "rejected":
         log_event(db, "notification_dispatched", "capture", capture.id, actor="system:notification-engine",
                    payload={"rule": "Recapture requested", "recipient": capture.technician_id})

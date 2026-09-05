@@ -7,6 +7,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..audit import log_event
 from ..scoring import score_candidates
+from ..auth import get_current_user, require_roles, client_scope_or_none, actor_label
 
 router = APIRouter(prefix="/v1/jobs", tags=["jobs"])
 
@@ -34,25 +35,39 @@ def job_to_dict(job: models.Job):
     }
 
 
+def check_job_visible(user: models.User, job: models.Job):
+    """Client-role users can only see jobs belonging to their own client —
+    enforced here, not just left to the frontend to behave itself."""
+    scope = client_scope_or_none(user)
+    if scope and job.site.client != scope:
+        raise HTTPException(403, "not authorized to view this job")
+
+
 @router.get("")
-def list_jobs(status: str = None, db: Session = Depends(get_db)):
+def list_jobs(status: str = None, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     q = db.query(models.Job)
     if status:
         statuses = status.split(",")
         q = q.filter(models.Job.status.in_(statuses))
-    return [job_to_dict(j) for j in q.all()]
+    jobs = q.all()
+    scope = client_scope_or_none(user)
+    if scope:
+        jobs = [j for j in jobs if j.site.client == scope]
+    return [job_to_dict(j) for j in jobs]
 
 
 @router.get("/{job_id}")
-def get_job(job_id: str, db: Session = Depends(get_db)):
+def get_job(job_id: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     job = db.get(models.Job, job_id)
     if not job:
         raise HTTPException(404, "job not found")
+    check_job_visible(user, job)
     return job_to_dict(job)
 
 
 @router.get("/{job_id}/candidates")
-def get_candidates(job_id: str, db: Session = Depends(get_db)):
+def get_candidates(job_id: str, user: models.User = Depends(require_roles("admin", "dispatcher")),
+                    db: Session = Depends(get_db)):
     job = db.get(models.Job, job_id)
     if not job:
         raise HTTPException(404, "job not found")
@@ -60,10 +75,11 @@ def get_candidates(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{job_id}/captures")
-def list_job_captures(job_id: str, db: Session = Depends(get_db)):
+def list_job_captures(job_id: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     job = db.get(models.Job, job_id)
     if not job:
         raise HTTPException(404, "job not found")
+    check_job_visible(user, job)
     return [
         {
             "capture_id": c.id, "checklist_item_id": c.checklist_item_id,
@@ -75,7 +91,9 @@ def list_job_captures(job_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{job_id}/assign")
-def assign_job(job_id: str, body: schemas.JobAssignIn, db: Session = Depends(get_db)):
+def assign_job(job_id: str, body: schemas.JobAssignIn,
+                user: models.User = Depends(require_roles("admin", "dispatcher")),
+                db: Session = Depends(get_db)):
     job = db.get(models.Job, job_id)
     if not job:
         raise HTTPException(404, "job not found")
@@ -88,9 +106,10 @@ def assign_job(job_id: str, body: schemas.JobAssignIn, db: Session = Depends(get
     job.dispatched_at = dt.datetime.utcnow()
     tech.active_job_id = job.id
 
-    log_event(db, "job_assigned", "job", job.id, actor=body.assigned_by,
+    # actor is the real authenticated identity, not whatever the client claimed in the body
+    log_event(db, "job_assigned", "job", job.id, actor=actor_label(user),
               payload={"technician_id": tech.id, "override_score": body.override_score})
-    log_event(db, "job_status_changed", "job", job.id, actor=body.assigned_by,
+    log_event(db, "job_status_changed", "job", job.id, actor=actor_label(user),
               payload={"to_status": "enroute"})
 
     db.commit()

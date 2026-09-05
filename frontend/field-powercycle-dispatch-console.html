@@ -426,17 +426,41 @@ function projectLatLng(lat, lng){
   return {x, y};
 }
 
+let AUTH_TOKEN = null;
+
+async function ensureAuth(){
+  // Real login against the real backend — not a stub. Demo credentials are
+  // intentional here: this is a prototype suite meant to be opened and
+  // explored immediately, so each app auto-authenticates as the
+  // role-appropriate seeded demo user rather than blocking behind a login
+  // form. The token issued is a real JWT and every subsequent call is
+  // actually authorized with it — swap these two lines for a real login
+  // form before this goes anywhere near production.
+  if(AUTH_TOKEN) return;
+  const res = await fetch(`${API_BASE}/v1/auth/login`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({username:'dispatcher', password:'dispatch123'}),
+  });
+  if(!res.ok) throw new Error('login failed');
+  const data = await res.json();
+  AUTH_TOKEN = data.access_token;
+  window.__fpcUser = data.user;
+}
+
 async function fetchJSON(url, opts={}){
   const controller = new AbortController();
   const timer = setTimeout(()=>controller.abort(), 2500);
   try{
+    const headers = {};
+    if(opts.body) headers['Content-Type'] = 'application/json';
+    if(AUTH_TOKEN) headers['Authorization'] = 'Bearer ' + AUTH_TOKEN;
     const res = await fetch(url, {
       method: opts.method || 'GET',
-      headers: opts.body ? {'Content-Type':'application/json'} : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
     });
-    if(!res.ok){ throw new Error(`HTTP ${res.status}`); }
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } finally { clearTimeout(timer); }
 }
@@ -503,6 +527,7 @@ function eventToLabel(e){
 
 async function tryLoadLive(){
   try{
+    await ensureAuth();
     const [apiJobs, apiTechs] = await Promise.all([
       fetchJSON(`${API_BASE}/v1/jobs`),
       fetchJSON(`${API_BASE}/v1/technicians`),

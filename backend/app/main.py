@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from . import models
 from .database import engine, get_db, Base
 from .seed import seed
-from .routers import locations, jobs, captures, review, notifications, invoices, analytics
+from .auth import get_current_user, require_roles, actor_label
+from .routers import locations, jobs, captures, review, notifications, invoices, analytics, auth as auth_router
 
 app = FastAPI(
     title="Field PowerCycle API",
@@ -23,6 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router.router)
 app.include_router(locations.router)
 app.include_router(jobs.router)
 app.include_router(captures.router)
@@ -38,6 +40,8 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     db = next(get_db())
     seed(db)
+    from .analytics_snapshot import start_background_scheduler
+    start_background_scheduler()
 
 
 @app.get("/")
@@ -52,7 +56,7 @@ def root():
 
 
 @app.get("/v1/sites")
-def list_sites(db: Session = Depends(get_db)):
+def list_sites(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     sites = db.query(models.Site).all()
     return [
         {"id": s.id, "name": s.name, "client": s.client, "address": s.address,
@@ -62,36 +66,44 @@ def list_sites(db: Session = Depends(get_db)):
 
 
 @app.patch("/v1/sites/{site_id}")
-def update_site(site_id: str, body: dict, db: Session = Depends(get_db)):
+def update_site(site_id: str, body: dict,
+                 user: models.User = Depends(require_roles("admin", "dispatcher")),
+                 db: Session = Depends(get_db)):
     site = db.get(models.Site, site_id)
     if not site:
-        return {"error": "site not found"}
+        raise HTTPException(404, "site not found")
     if "geofence_radius_m" in body:
         old = site.geofence_radius_m
         site.geofence_radius_m = body["geofence_radius_m"]
         from .audit import log_event
-        log_event(db, "site_geofence_updated", "site", site.id, actor="dispatcher:settings",
+        log_event(db, "site_geofence_updated", "site", site.id, actor=actor_label(user),
                    payload={"old_radius_m": old, "new_radius_m": body["geofence_radius_m"]})
         db.commit()
     return {"id": site.id, "geofence_radius_m": site.geofence_radius_m}
 
 
 @app.get("/v1/technicians")
-def list_technicians(db: Session = Depends(get_db)):
+def list_technicians(user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     techs = db.query(models.Technician).all()
+    # client-role users can see technician names/positions (needed for live tracking)
+    # but not certifications or pay rate — that's internal workforce data
+    is_client = user.role == "client"
     return [
         {
             "id": t.id, "name": t.name, "status": t.status,
             "lat": t.lat, "lng": t.lng, "active_job_id": t.active_job_id,
-            "certifications": t.certifications, "hourly_rate": t.hourly_rate,
-            "onboarding_steps": t.onboarding_steps,
+            "certifications": None if is_client else t.certifications,
+            "hourly_rate": None if is_client else t.hourly_rate,
+            "onboarding_steps": None if is_client else t.onboarding_steps,
         }
         for t in techs
     ]
 
 
 @app.get("/v1/audit-events")
-def list_audit_events(entity_id: str = None, limit: int = 100, db: Session = Depends(get_db)):
+def list_audit_events(entity_id: str = None, limit: int = 100,
+                       user: models.User = Depends(require_roles("admin", "dispatcher")),
+                       db: Session = Depends(get_db)):
     q = db.query(models.AuditEvent)
     if entity_id:
         q = q.filter(models.AuditEvent.entity_id == entity_id)

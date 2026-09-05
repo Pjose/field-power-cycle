@@ -9,7 +9,9 @@ actual computation.
 
 ## What's real here
 
-- **A real database.** SQLite via SQLAlchemy, with the same entities described
+- **A real database with real migrations.** Postgres via SQLAlchemy and
+  Alembic by default — not SQLite pretending to be a production database.
+  The same entities described
   in the architecture doc: sites, technicians, jobs, checklist items, location
   pings, captures, audit events, notification rules, invoices.
 - **Real geofence math.** `app/verification.py` computes actual haversine
@@ -46,15 +48,34 @@ actual computation.
 This is a backend for a prototype suite, not a production deployment. Notably
 not implemented:
 
-- **Object storage.** `/v1/captures/init` returns a mock `upload_url`
+- **A production-grade scheduler.** The analytics snapshot job runs in a
+  plain daemon thread inside the API process (see
+  `app/analytics_snapshot.py`) — fine for this single-process reference
+  deployment, wrong for a real multi-worker production deployment, where
+  every worker would take its own redundant snapshot. A real deployment
+  runs this as a separate cron job, Celery beat task, or cloud scheduler
+  instead.
+
+- **Real object storage.** `/v1/captures/init` returns a mock `upload_url`
   instead of a real S3/GCS pre-signed URL, and `/complete` doesn't expect an
   actual file — there's no media storage layer here.
-- **Auth.** Every endpoint is open. The API contract describes bearer-token
-  scoping per technician/dispatcher; none of that is enforced yet.
 - **Real SMS/email/push delivery.** The notification *rules* are modeled and
   toggleable, and every trigger condition writes a real audit event, but
   nothing calls out to Twilio/SendGrid/APNs. `GET /v1/notifications/feed`
-  surfaces the audit events that *would* have fired a notification.
+  surfaces the audit events that *would* have fired a notification, marked
+  `"logged"` rather than a fabricated `"delivered"`.
+- **A production secret management story.** `FPC_JWT_SECRET` falls back to
+  a randomly generated value at process start if not set via environment —
+  fine for this reference deployment, but it means every login token is
+  invalidated on restart, and a real deployment needs a real secret held
+  outside the process (see Authentication below).
+- **Device signing.** The API contract describes a `device_signature`
+  binding GPS/timestamp to a capture at the moment of shutter-press. This
+  backend accepts a `content_hash` but doesn't verify a real cryptographic
+  device signature.
+- **Rate limiting and HTTPS termination** — standard "before this touches
+  the real internet" items not attempted here (a real deployment sits this
+  behind a reverse proxy / API gateway that handles both).
 - **Frontend wiring — all eleven done.** Every HTML prototype in the suite
   now attempts to load real data from `http://127.0.0.1:8000` on open, and
   falls back to embedded demo data if the backend isn't reachable — a
@@ -96,15 +117,23 @@ not implemented:
     SLA tier targets, client portal-access toggles, integrations) has no
     real backing store in this prototype and is left as static reference
     — stated plainly rather than half-wired.
-  - **Analytics** — added `GET /v1/analytics/summary`, a real server-side
+  - **Analytics** — `GET /v1/analytics/summary` is a real server-side
     aggregation (SLA compliance, avg response time, verification funnel,
     jobs by type, a heuristic jobs-by-industry bucketing from client name,
     and a technician leaderboard) computed fresh from whatever's actually
-    in the database. The one thing intentionally *not* faked: the SLA
-    trend chart and 7D/30D/90D range toggle. This backend keeps live
-    state, not historical snapshots, so there's no honest multi-week trend
-    to plot — live mode shows the current compliance number plainly and
-    disables the range toggle rather than fabricating a line chart.
+    in the database. The SLA trend chart, which used to show a single live
+    number with an honest note that no historical data existed, now plots
+    real history: `AnalyticsSnapshot` rows are taken automatically by a
+    background thread every 5 minutes (`app/analytics_snapshot.py` — the
+    interval is compressed for demo purposes; a real deployment sets it to
+    daily) and there's a "+ Take snapshot now" button in the UI to trigger
+    one on demand. Confirmed during testing: `jobs_done` moved 2→3 and
+    `sla_compliance_pct` moved 100%→67% between two real snapshots taken
+    before and after completing more work — an actual trend from actual
+    state changes, not interpolated or synthesized. The 7D/30D/90D range
+    toggle still disables in live mode, since real snapshot history
+    doesn't yet span real weeks — that's a true limitation of a
+    freshly-seeded database, not something faked around.
 
   Two real bugs surfaced and fixed during this process: `job_to_dict()`
   never exposed a job's own `completed_at`/`arrived_at` at the top level
@@ -115,22 +144,145 @@ not implemented:
   GPS/timestamp to a capture at the moment of shutter-press. This backend
   accepts a `content_hash` but doesn't verify a real cryptographic signature.
 
+## Authentication
+
+This is real, not a stand-in. Every endpoint except `POST /v1/auth/login`
+requires a valid bearer token, and roles genuinely restrict what a token
+can do — verified during development, not just implemented and assumed
+correct:
+
+- **Unauthenticated requests are rejected.** No Authorization header → `401`.
+- **Client-role users are scoped to their own company's data.** `GET /v1/jobs`
+  silently filters to only jobs at that client's sites; requesting another
+  client's job directly (`GET /v1/jobs/{id}`) returns `403`, not the data.
+  Confirmed: an Apex Dining Brands client token sees 3 jobs from `GET /v1/jobs`
+  where a dispatcher token sees 7, and a direct request for a Copperline
+  Hospitality job returns `403`.
+- **Technicians can only act as themselves.** `POST /v1/locations/ping` and
+  `POST /v1/captures/init` both reject a technician's token if the
+  `technician_id` in the request body doesn't match their own — confirmed:
+  Priya's token gets `403` submitting a GPS ping as Dana, `200` submitting
+  one as herself. Dispatchers and admins are allowed to act on a
+  technician's behalf (e.g. resolving a support call), but every such
+  action is attributed to the *real* authenticated actor in the audit log
+  (`dispatcher:D. Vance`, never silently attributed to the technician).
+- **Internal tools are dispatcher/admin only.** Billing, the review queue,
+  notification rules, analytics, and the audit log all reject technician
+  and client tokens with `403`.
+
+### Demo users (seeded, real bcrypt-hashed passwords)
+
+| Username | Password | Role | Scope |
+|---|---|---|---|
+| `admin` | `admin123` | admin | everything |
+| `dispatcher` | `dispatch123` | dispatcher | everything except user management |
+| `priya` | `tech123` | technician | only T-092 (Priya Chandran)'s own actions |
+| `dana` | `tech123` | technician | only T-118 (Dana Whitfield)'s own actions |
+| `grace` | `tech123` | technician | only T-059 (Grace Halden)'s own actions |
+| `apex` | `client123` | client | only Apex Dining Brands' jobs |
+| `copperline` | `client123` | client | only Copperline Hospitality's jobs |
+
+```bash
+curl -X POST http://localhost:8000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"dispatcher","password":"dispatch123"}'
+# -> {"access_token": "eyJ...", "token_type": "bearer", "expires_in_hours": 12, "user": {...}}
+
+curl http://localhost:8000/v1/jobs -H "Authorization: Bearer <token>"
+```
+
+### How the frontends handle this
+
+Rather than gate every prototype behind a login form, each of the nine
+live-wired HTML files calls `ensureAuth()` before its first live request —
+a real login against the real backend using the role-appropriate demo
+account above (the dispatch console logs in as `dispatcher`, the technician
+app as `priya`, the client portal as `apex`, and so on). The token returned
+is a genuine JWT and every subsequent `fetchJSON` call sends it as a real
+`Authorization` header — this isn't faked or bypassed, it's just automated
+for a frictionless demo. A real deployment would replace `ensureAuth()`'s
+two hardcoded lines with an actual login form; everything downstream of
+that (the token, the header, the 401/403 enforcement) already works
+correctly either way.
+
+### What a real deployment still needs on top of this
+
+- A real secret held outside the process for `FPC_JWT_SECRET` (a `.env`
+  file or secrets manager — not the random-per-restart fallback used here)
+- Refresh tokens / shorter-lived access tokens (currently a flat 12-hour
+  expiry with no refresh flow)
+- A user-management surface (there's no `POST /v1/users` — new accounts
+  are only created via `seed.py` right now)
+- Rate limiting on `/v1/auth/login` to blunt credential-stuffing attempts
+
 ## Running it
+
+### With Postgres (the real default)
+
+This now runs against real Postgres by default, with real Alembic
+migrations — not `create_all()` pretending to be a migration story.
+
+```bash
+# one-time: install Postgres and create the app database/user
+sudo apt-get install postgresql
+sudo service postgresql start
+sudo -u postgres psql -c "CREATE USER fpc_app WITH PASSWORD 'fpc_dev_password';"
+sudo -u postgres psql -c "CREATE DATABASE fieldpowercycle OWNER fpc_app;"
+
+cd backend
+pip install -r requirements.txt
+
+# run the real migration (not create_all — this is what a deploy actually runs)
+alembic upgrade head
+
+uvicorn app.main:app --reload --port 8000
+```
+
+The app connects to `postgresql+psycopg://fpc_app:fpc_dev_password@localhost:5432/fieldpowercycle`
+by default. Override with `FPC_DATABASE_URL` for a different host, managed
+Postgres instance (RDS, Cloud SQL, etc.), or credentials.
+
+**Schema changes go through Alembic, not model edits alone.** After
+changing a model in `app/models.py`:
+```bash
+alembic revision --autogenerate -m "describe the change"
+# then READ the generated migration before running it — autogenerate got
+# the table ordering wrong on the very first migration in this project
+# (see the comment at the top of alembic/versions/52864d5b5cf3_*.py) because
+# of genuine circular foreign keys between jobs/technicians and
+# captures/checklist_items. Autogenerate is a draft, not a guarantee.
+alembic upgrade head
+```
+
+### Without Postgres (quick local/offline dev)
 
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+FPC_ALLOW_SQLITE_FALLBACK=1 uvicorn app.main:app --reload --port 8000
 ```
 
-Then visit `http://localhost:8000/docs` for interactive API docs, or
-`http://localhost:8000/` for a health check. The database (`fieldpowercycle.db`)
-is created and seeded automatically on first startup with the same sites,
-technicians, and jobs used across the other prototypes (Apex Dining Brands,
-Copperline Hospitality, Marcus Reyes, Priya Chandran, etc.) so IDs and names
-line up if you cross-reference against the frontend mockups.
+This skips Alembic entirely and falls back to a local SQLite file
+(`fieldpowercycle.db`, auto-created via `Base.metadata.create_all()` on
+startup) — convenient for a five-minute local test, not what a real
+deployment should run on. The fallback requires the environment variable
+explicitly rather than triggering silently, so nobody accidentally ends up
+running SQLite in a context they thought was Postgres.
 
-Delete `fieldpowercycle.db` to reset to a clean seeded state.
+### Either way
+
+Visit `http://localhost:8000/docs` for interactive API docs, or
+`http://localhost:8000/` for a health check. The database is seeded
+automatically on first startup with the same sites, technicians, and jobs
+used across the other prototypes (Apex Dining Brands, Copperline
+Hospitality, Marcus Reyes, Priya Chandran, etc.) plus the demo user
+accounts listed under Authentication above, so IDs and names line up if
+you cross-reference against the frontend mockups.
+
+To reset to a clean seeded state: drop and recreate the Postgres database
+(`DROP DATABASE fieldpowercycle; CREATE DATABASE fieldpowercycle OWNER
+fpc_app;`, then `alembic upgrade head` again) or delete
+`fieldpowercycle.db` if running in SQLite fallback mode.
 
 ## A worked example
 
@@ -138,31 +290,38 @@ This is the actual sequence exercised while building this backend, runnable
 against a fresh database:
 
 ```bash
+# 0. Log in and capture a token — every call below needs it
+TOKEN=$(curl -s -X POST http://localhost:8000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"dispatcher","password":"dispatch123"}' | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+
 # 1. Score candidates for an unassigned ticket — certification-gated, real distance
-curl http://localhost:8000/v1/jobs/JB-4478/candidates
+curl http://localhost:8000/v1/jobs/JB-4478/candidates -H "Authorization: Bearer $TOKEN"
 
 # 2. Assign it to the top candidate
 curl -X POST http://localhost:8000/v1/jobs/JB-4478/assign \
-  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"technician_id":"T-118","assigned_by":"dispatcher:D-Vance"}'
 
 # 3. Technician's GPS crosses into the site geofence — job auto-flips to onsite
-curl -X POST http://localhost:8000/v1/locations/ping \
-  -H "Content-Type: application/json" \
-  -d '{"technician_id":"T-118","lat":32.7900,"lng":-96.7900}'
-curl -X POST http://localhost:8000/v1/locations/ping \
-  -H "Content-Type: application/json" \
-  -d '{"technician_id":"T-118","lat":32.7801,"lng":-96.7989}'
+#    (log in as the technician for this step — they can only act as themselves)
+TECH_TOKEN=$(curl -s -X POST http://localhost:8000/v1/auth/login \
+  -H "Content-Type: application/json" -d '{"username":"dana","password":"tech123"}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+curl -X POST http://localhost:8000/v1/locations/ping -H "Authorization: Bearer $TECH_TOKEN" \
+  -H "Content-Type: application/json" -d '{"technician_id":"T-118","lat":32.7900,"lng":-96.7900}'
+curl -X POST http://localhost:8000/v1/locations/ping -H "Authorization: Bearer $TECH_TOKEN" \
+  -H "Content-Type: application/json" -d '{"technician_id":"T-118","lat":32.7801,"lng":-96.7989}'
 
 # 4. Capture proof inside the geofence — auto-verifies, satisfies the checklist item
-curl -X POST http://localhost:8000/v1/captures/init \
+curl -X POST http://localhost:8000/v1/captures/init -H "Authorization: Bearer $TECH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"job_id":"JB-4478","technician_id":"T-118","capture_type":"photo",
        "content_hash":"sha256:aaa111","capture_lat":32.7801,"capture_lng":-96.7989}'
-curl -X POST http://localhost:8000/v1/captures/<capture_id>/complete
+curl -X POST http://localhost:8000/v1/captures/<capture_id>/complete -H "Authorization: Bearer $TECH_TOKEN"
 
 # 5. Once a job has real arrived_at/completed_at timestamps, generate an invoice
-curl -X POST http://localhost:8000/v1/invoices/generate/JB-4469 \
+curl -X POST http://localhost:8000/v1/invoices/generate/JB-4469 -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"materials":[{"name":"KDS mounting hardware kit","qty":4,"unit_price":38}]}'
 ```
@@ -172,6 +331,11 @@ curl -X POST http://localhost:8000/v1/invoices/generate/JB-4469 \
 ```
 backend/
   requirements.txt
+  alembic.ini          Alembic config — URL is overridden at runtime by alembic/env.py
+  alembic/
+    env.py               Wired to real app models + FPC_DATABASE_URL
+    versions/
+      52864d5b5cf3_initial_schema.py   Hand-corrected — see the docstring for why
   app/
     main.py           FastAPI app, route registration, startup/seed, /v1/technicians, /v1/sites, /v1/audit-events
     database.py        SQLAlchemy engine/session
@@ -181,13 +345,17 @@ backend/
     scoring.py              Assignment candidate scoring
     billing.py                Invoice line-item calculation
     audit.py                   Append-only event logging helper
-    seed.py                     Seed data matching the frontend prototypes
+    auth.py                     Real password hashing, JWT issuance, role/ownership checks
+    analytics_core.py            Shared aggregation logic (live summary AND snapshots use this)
+    analytics_snapshot.py         Real background scheduler + manual snapshot trigger
+    seed.py                        Seed data matching the frontend prototypes, plus demo users
     routers/
-      locations.py               GPS ping ingestion + geofence crossing
-      jobs.py                     Job queue, assignment, candidate scoring
-      captures.py                 Capture init/complete — runs the verification engine
-      review.py                    Dispatcher review queue for flagged captures
-      notifications.py             Rule toggling + audit-backed activity feed
-      invoices.py                   Billing queue, invoice generation, invoice list
-      analytics.py                  Real aggregation: KPIs, funnel, jobs by type/industry, leaderboard
+      auth.py                     Login + current-user endpoints
+      locations.py                 GPS ping ingestion + geofence crossing
+      jobs.py                       Job queue, assignment, candidate scoring
+      captures.py                   Capture init/complete — runs the verification engine
+      review.py                      Dispatcher review queue for flagged captures
+      notifications.py               Rule toggling + audit-backed activity feed
+      invoices.py                     Billing queue, invoice generation, invoice list
+      analytics.py                    Live summary + real historical snapshot endpoints
 ```

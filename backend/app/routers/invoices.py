@@ -7,12 +7,13 @@ from .. import models, schemas
 from ..database import get_db
 from ..audit import log_event
 from ..billing import build_invoice
+from ..auth import require_roles, actor_label
 
 router = APIRouter(prefix="/v1/invoices", tags=["invoices"])
 
 
 @router.get("/queue")
-def invoice_queue(db: Session = Depends(get_db)):
+def invoice_queue(user: models.User = Depends(require_roles("admin", "dispatcher")), db: Session = Depends(get_db)):
     """Jobs that are done, have real arrival/completion timestamps, and don't
     already have an invoice — exactly the set the Billing tool's queue shows."""
     invoiced_job_ids = {i.job_id for i in db.query(models.Invoice).all()}
@@ -35,7 +36,9 @@ def invoice_queue(db: Session = Depends(get_db)):
 
 
 @router.post("/generate/{job_id}")
-def generate_invoice(job_id: str, body: schemas.InvoiceGenerateIn, db: Session = Depends(get_db)):
+def generate_invoice(job_id: str, body: schemas.InvoiceGenerateIn,
+                      user: models.User = Depends(require_roles("admin", "dispatcher")),
+                      db: Session = Depends(get_db)):
     job = db.get(models.Job, job_id)
     if not job:
         raise HTTPException(404, "job not found")
@@ -55,7 +58,7 @@ def generate_invoice(job_id: str, body: schemas.InvoiceGenerateIn, db: Session =
     )
     db.add(invoice)
     db.flush()  # assigns invoice.id via its default before we reference it below
-    log_event(db, "invoice_generated", "invoice", invoice.id, actor="system:billing-engine",
+    log_event(db, "invoice_generated", "invoice", invoice.id, actor=actor_label(user),
               payload={"job_id": job.id, "total": result["total"]})
     db.commit()
     db.refresh(invoice)
@@ -69,7 +72,7 @@ def generate_invoice(job_id: str, body: schemas.InvoiceGenerateIn, db: Session =
 
 
 @router.get("")
-def list_invoices(db: Session = Depends(get_db)):
+def list_invoices(user: models.User = Depends(require_roles("admin", "dispatcher")), db: Session = Depends(get_db)):
     invoices = db.query(models.Invoice).all()
     return [
         {"invoice_id": i.id, "job_id": i.job_id, "client": i.client,
@@ -80,11 +83,12 @@ def list_invoices(db: Session = Depends(get_db)):
 
 
 @router.post("/{invoice_id}/send")
-def send_invoice(invoice_id: str, db: Session = Depends(get_db)):
+def send_invoice(invoice_id: str, user: models.User = Depends(require_roles("admin", "dispatcher")),
+                  db: Session = Depends(get_db)):
     invoice = db.get(models.Invoice, invoice_id)
     if not invoice:
         raise HTTPException(404, "invoice not found")
     invoice.status = "sent"
-    log_event(db, "invoice_sent", "invoice", invoice.id, actor="dispatcher", payload={})
+    log_event(db, "invoice_sent", "invoice", invoice.id, actor=actor_label(user), payload={})
     db.commit()
     return {"invoice_id": invoice.id, "status": invoice.status}

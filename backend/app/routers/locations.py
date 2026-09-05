@@ -7,12 +7,14 @@ from .. import models, schemas
 from ..database import get_db
 from ..verification import haversine_distance_m
 from ..audit import log_event
+from ..auth import get_current_user, check_technician_self, actor_label
 
 router = APIRouter(prefix="/v1/locations", tags=["locations"])
 
 
 @router.post("/ping", response_model=schemas.LocationPingOut)
-def post_ping(body: schemas.LocationPingIn, db: Session = Depends(get_db)):
+def post_ping(body: schemas.LocationPingIn, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    check_technician_self(user, body.technician_id)
     tech = db.get(models.Technician, body.technician_id)
     if not tech:
         raise HTTPException(404, "technician not found")
@@ -43,14 +45,14 @@ def post_ping(body: schemas.LocationPingIn, db: Session = Depends(get_db)):
 
             if was_inside is False and is_inside is True:
                 geofence_event = {"type": "entered", "job_id": job.id, "distance_m": round(new_dist, 1)}
-                log_event(db, "geofence_entered", "job", job.id, actor=f"technician:{tech.id}",
+                log_event(db, "geofence_entered", "job", job.id, actor=actor_label(user),
                           payload={"distance_m": round(new_dist, 1)})
                 if job.status == "enroute":
                     job.status = "onsite"
                     job.arrived_at = received_ts
             elif was_inside is True and is_inside is False:
                 geofence_event = {"type": "exited", "job_id": job.id, "distance_m": round(new_dist, 1)}
-                log_event(db, "geofence_exited", "job", job.id, actor=f"technician:{tech.id}",
+                log_event(db, "geofence_exited", "job", job.id, actor=actor_label(user),
                           payload={"distance_m": round(new_dist, 1)})
 
     tech.lat = body.lat
@@ -58,7 +60,7 @@ def post_ping(body: schemas.LocationPingIn, db: Session = Depends(get_db)):
     tech.last_ping_at = received_ts
 
     log_event(db, "location_ping_received", "technician", tech.id,
-              actor=f"technician:{tech.id}", payload={"lat": body.lat, "lng": body.lng})
+              actor=actor_label(user), payload={"lat": body.lat, "lng": body.lng})
 
     db.commit()
     return schemas.LocationPingOut(received_ts=received_ts, geofence_event=geofence_event)

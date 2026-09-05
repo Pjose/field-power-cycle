@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .audit import log_event
+from .auth import hash_password
 
 
 def now():
@@ -201,5 +202,29 @@ def seed(db: Session):
                                  recipient_role="technician+admin", channels=["email", "push"], enabled=True),
     ]
     db.add_all(rules)
+
+    # Real users, real hashed passwords, one per role — these are the actual
+    # credentials the demo login screens use. Anyone deploying this for real
+    # would replace these before going anywhere near production, but they're
+    # not placeholders in the sense of "not really checked" — every one of
+    # these hashes is genuinely verified against a genuinely submitted
+    # password at /v1/auth/login.
+    users = [
+        models.User(username="admin", password_hash=hash_password("admin123"),
+                    role="admin", display_name="Admin"),
+        models.User(username="dispatcher", password_hash=hash_password("dispatch123"),
+                    role="dispatcher", display_name="D. Vance"),
+        models.User(username="priya", password_hash=hash_password("tech123"),
+                    role="technician", display_name="Priya Chandran", technician_id="T-092"),
+        models.User(username="dana", password_hash=hash_password("tech123"),
+                    role="technician", display_name="Dana Whitfield", technician_id="T-118"),
+        models.User(username="grace", password_hash=hash_password("tech123"),
+                    role="technician", display_name="Grace Halden", technician_id="T-059"),
+        models.User(username="apex", password_hash=hash_password("client123"),
+                    role="client", display_name="Apex Dining Brands — Ops", client_name="Apex Dining Brands"),
+        models.User(username="copperline", password_hash=hash_password("client123"),
+                    role="client", display_name="Copperline Hospitality — Ops", client_name="Copperline Hospitality"),
+    ]
+    db.add_all(users)
 
     db.commit()

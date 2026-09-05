@@ -143,3 +143,36 @@ class Invoice(Base):
     status = Column(String, default="draft")  # draft | sent | paid | overdue
     issued_at = Column(DateTime, default=now)
     due_at = Column(DateTime, nullable=True)
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(String, primary_key=True, default=lambda: gen_id("USR"))
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # admin | dispatcher | technician | client
+    display_name = Column(String, nullable=False)
+    technician_id = Column(String, ForeignKey("technicians.id"), nullable=True)  # set when role == technician
+    client_name = Column(String, nullable=True)  # set when role == client — scopes visibility to this client's jobs
+    active = Column(Boolean, default=True)
+
+
+class AnalyticsSnapshot(Base):
+    __tablename__ = "analytics_snapshots"
+    id = Column(String, primary_key=True, default=lambda: gen_id("SNAP"))
+    taken_at = Column(DateTime, default=now)
+    # a persisted copy of what GET /v1/analytics/summary computes live —
+    # this is what makes a real trend line possible instead of narrating
+    # that one isn't available. See app/analytics_snapshot.py.
+    jobs_total = Column(Integer)
+    jobs_done = Column(Integer)
+    sla_compliance_pct = Column(Float, nullable=True)
+    avg_response_min = Column(Float, nullable=True)
+    captures_total = Column(Integer)
+    captures_verified = Column(Integer)
+    captures_flagged_open = Column(Integer)
+    captures_resolved = Column(Integer)
+    auto_verify_pct = Column(Float, nullable=True)
+    jobs_by_type = Column(JSON, default=dict)
+    jobs_by_industry = Column(JSON, default=dict)
+    technician_leaderboard = Column(JSON, default=list)

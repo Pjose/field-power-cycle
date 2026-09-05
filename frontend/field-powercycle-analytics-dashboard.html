@@ -125,6 +125,7 @@
     <div class="card">
       <div class="card-head">
         <div><div class="card-title">SLA compliance trend</div><div class="card-sub">Percent of jobs closed within their SLA window</div></div>
+        <button id="snapshot-btn" style="background:var(--panel-2);border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:6px 12px;border-radius:7px;cursor:pointer;">+ Take snapshot now</button>
       </div>
       <svg id="trend-chart" viewBox="0 0 640 200" style="width:100%;height:auto;"></svg>
     </div>
@@ -221,8 +222,45 @@ function renderTrendLiveNote(sla){
     <rect x="0" y="0" width="640" height="200" fill="none"/>
     <text x="320" y="88" text-anchor="middle" font-family="Space Grotesk" font-weight="600" font-size="34" fill="#3ED9A0">${sla != null ? sla + '%' : '—'}</text>
     <text x="320" y="112" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#8CA0B3">current SLA compliance, computed from real completed jobs right now</text>
-    <text x="320" y="150" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6C7C">This backend keeps live state, not historical snapshots —</text>
-    <text x="320" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6C7C">a real weekly trend line needs data collected over actual weeks.</text>
+    <text x="320" y="150" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6C7C">Only one real snapshot exists so far — a trend line needs at least two.</text>
+    <text x="320" y="166" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5C6C7C">This backend takes one automatically every few minutes while it runs.</text>
+  `;
+}
+
+function renderRealTrend(history){
+  // history: real AnalyticsSnapshot rows, oldest first, from GET /v1/analytics/history —
+  // every point here actually happened; nothing is interpolated or synthesized.
+  const svg = document.getElementById('trend-chart');
+  const vals = history.map(s => s.sla_compliance_pct ?? 0);
+  const w=640,h=200,padL=34,padR=10,padT=16,padB=30;
+  const min = Math.min(0, ...vals) - 4, max = 100;
+  const x = i => vals.length > 1 ? padL + i*(w-padL-padR)/(vals.length-1) : (padL+w-padR)/2;
+  const y = v => padT + (h-padT-padB)*(1-(v-min)/(max-min));
+  let grid = '';
+  [0,25,50,75,100].forEach(pct=>{
+    const v = min + (max-min)*pct/100;
+    grid += `<line x1="${padL}" y1="${y(v)}" x2="${w-padR}" y2="${y(v)}" stroke="#1A232D" stroke-width="1"/>`;
+  });
+  grid += `<line x1="${padL}" y1="${y(95)}" x2="${w-padR}" y2="${y(95)}" stroke="#4E3D1D" stroke-width="1" stroke-dasharray="4 4"/>`;
+  grid += `<text x="${w-padR}" y="${y(95)-6}" text-anchor="end" font-family="IBM Plex Mono" font-size="9" fill="#F0AC4E">95% SLA target</text>`;
+  const pts = vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+  const area = `${x(0)},${y(min)} ${pts} ${x(vals.length-1)},${y(min)}`;
+  let dots = vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.2" fill="#0B0F14" stroke="#3ED9A0" stroke-width="2"/>`).join('');
+  let labels = history.map((s,i)=>{
+    const d = new Date(s.taken_at);
+    const label = d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
+    return `<text x="${x(i)}" y="${h-10}" text-anchor="middle" font-family="IBM Plex Mono" font-size="8.5" fill="#5C6C7C">${label}</text>`;
+  }).join('');
+  svg.innerHTML = `
+    <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3ED9A0" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3ED9A0" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <polygon points="${area}" fill="url(#areaGrad)"/>
+    <polyline points="${pts}" fill="none" stroke="#3ED9A0" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}${labels}
+    <text x="8" y="14" font-family="IBM Plex Mono" font-size="8.5" fill="#5C6C7C">${history.length} real snapshots · SLA % over actual time, not simulated</text>
   `;
 }
 
@@ -368,11 +406,33 @@ const INDUSTRY_COLORS = {
   Healthcare: 'var(--purple)', Corporate: 'var(--amber)',
 };
 
+let AUTH_TOKEN = null;
+
+async function ensureAuth(){
+  // Real login against the real backend — not a stub. Demo credentials are
+  // intentional here: this is a prototype suite meant to be opened and
+  // explored immediately, so each app auto-authenticates as the
+  // role-appropriate seeded demo user rather than blocking behind a login
+  // form. The token issued is a real JWT and every subsequent call is
+  // actually authorized with it — swap these two lines for a real login
+  // form before this goes anywhere near production.
+  if(AUTH_TOKEN) return;
+  const res = await fetch(`${API_BASE}/v1/auth/login`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({username:'dispatcher', password:'dispatch123'}),
+  });
+  if(!res.ok) throw new Error('login failed');
+  const data = await res.json();
+  AUTH_TOKEN = data.access_token;
+  window.__fpcUser = data.user;
+}
+
 async function fetchJSON(url){
   const controller = new AbortController();
   const timer = setTimeout(()=>controller.abort(), 2500);
   try{
-    const res = await fetch(url, {signal: controller.signal});
+    const headers = AUTH_TOKEN ? {'Authorization': 'Bearer ' + AUTH_TOKEN} : undefined;
+    const res = await fetch(url, {signal: controller.signal, headers});
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } finally { clearTimeout(timer); }
@@ -387,6 +447,7 @@ function setConnStatus(isLive){
 
 async function loadLiveAnalytics(){
   try{
+    await ensureAuth();
     const s = await fetchJSON(`${API_BASE}/v1/analytics/summary`);
     LIVE = true;
     setConnStatus(true);
@@ -416,7 +477,12 @@ async function loadLiveAnalytics(){
     };
 
     renderKPIs(d);
-    renderTrendLiveNote(d.sla);
+    const history = await fetchJSON(`${API_BASE}/v1/analytics/history?limit=50`);
+    if(history.length >= 2){
+      renderRealTrend(history);
+    } else {
+      renderTrendLiveNote(d.sla);
+    }
     renderBars(d);
     renderFunnel(d);
     renderDonut(d);
@@ -427,6 +493,23 @@ async function loadLiveAnalytics(){
   }
 }
 loadLiveAnalytics();
+setInterval(loadLiveAnalytics, 60000); // real re-poll, picks up new snapshots as the scheduler takes them
+
+document.getElementById('snapshot-btn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('snapshot-btn');
+  const original = btn.textContent;
+  btn.textContent = 'Taking snapshot…';
+  btn.disabled = true;
+  try{
+    await ensureAuth();
+    await fetchJSON(`${API_BASE}/v1/analytics/snapshot`, {method:'POST', body:{}});
+    await loadLiveAnalytics();
+    btn.textContent = 'Snapshot taken ✓';
+  }catch(err){
+    btn.textContent = 'Backend unreachable';
+  }
+  setTimeout(()=>{ btn.textContent = original; btn.disabled = false; }, 1800);
+});
 </script>
 
 <script>

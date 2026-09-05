@@ -7,6 +7,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..audit import log_event
 from ..verification import run_verification
+from ..auth import get_current_user, check_technician_self, actor_label
 
 router = APIRouter(prefix="/v1/captures", tags=["captures"])
 
@@ -27,7 +28,8 @@ def capture_to_dict(cap: models.Capture):
 
 
 @router.post("/init")
-def init_capture(body: schemas.CaptureInitIn, db: Session = Depends(get_db)):
+def init_capture(body: schemas.CaptureInitIn, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    check_technician_self(user, body.technician_id)
     job = db.get(models.Job, body.job_id)
     if not job:
         raise HTTPException(404, "job not found")
@@ -48,7 +50,7 @@ def init_capture(body: schemas.CaptureInitIn, db: Session = Depends(get_db)):
     )
     db.add(capture)
     db.flush()  # assigns capture.id via its default before we reference it below
-    log_event(db, "capture_initiated", "capture", capture.id, actor=f"technician:{tech.id}",
+    log_event(db, "capture_initiated", "capture", capture.id, actor=actor_label(user),
               payload={"job_id": job.id, "checklist_item_id": body.checklist_item_id})
     db.commit()
     db.refresh(capture)
@@ -59,10 +61,11 @@ def init_capture(body: schemas.CaptureInitIn, db: Session = Depends(get_db)):
 
 
 @router.post("/{capture_id}/complete")
-def complete_capture(capture_id: str, db: Session = Depends(get_db)):
+def complete_capture(capture_id: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     capture = db.get(models.Capture, capture_id)
     if not capture:
         raise HTTPException(404, "capture not found")
+    check_technician_self(user, capture.technician_id)
 
     result = run_verification(db, capture)
     capture.status = result["status"]
@@ -96,7 +99,7 @@ def complete_capture(capture_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{capture_id}")
-def get_capture(capture_id: str, db: Session = Depends(get_db)):
+def get_capture(capture_id: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     capture = db.get(models.Capture, capture_id)
     if not capture:
         raise HTTPException(404, "capture not found")
