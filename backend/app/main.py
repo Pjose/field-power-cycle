@@ -6,7 +6,7 @@ from . import models
 from .database import engine, get_db, Base
 from .seed import seed
 from .auth import get_current_user, require_roles, actor_label
-from .routers import locations, jobs, captures, review, notifications, invoices, analytics, auth as auth_router
+from .routers import locations, jobs, captures, review, notifications, invoices, analytics, media, auth as auth_router
 
 app = FastAPI(
     title="Field PowerCycle API",
@@ -33,6 +33,7 @@ app.include_router(notifications.router)
 app.include_router(notifications.feed_router)
 app.include_router(invoices.router)
 app.include_router(analytics.router)
+app.include_router(media.router)
 
 
 @app.on_event("startup")

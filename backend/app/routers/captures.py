@@ -8,6 +8,7 @@ from ..database import get_db
 from ..audit import log_event
 from ..verification import run_verification
 from ..auth import get_current_user, check_technician_self, actor_label
+from ..storage import generate_upload_token, file_exists
 
 router = APIRouter(prefix="/v1/captures", tags=["captures"])
 
@@ -55,9 +56,13 @@ def init_capture(body: schemas.CaptureInitIn, user: models.User = Depends(get_cu
     db.commit()
     db.refresh(capture)
 
-    # in production this would return a pre-signed upload URL; the sandboxed
-    # demo has no object storage, so /complete is called directly with no body.
-    return {"capture_id": capture.id, "upload_url": f"mock://upload/{capture.id}", "expires_in": 300}
+    # A real signed upload URL now, not a mock string. No Bearer auth is
+    # needed on the PUT itself — the embedded token is time-limited and
+    # capture-specific, the same authorization model a real S3 pre-signed
+    # URL uses. Whatever bytes land there get hash-verified for real
+    # against content_hash before /complete will run.
+    token = generate_upload_token(capture.id)
+    return {"capture_id": capture.id, "upload_url": f"/v1/media/upload/{capture.id}?token={token}", "expires_in": 300}
 
 
 @router.post("/{capture_id}/complete")
@@ -66,6 +71,13 @@ def complete_capture(capture_id: str, user: models.User = Depends(get_current_us
     if not capture:
         raise HTTPException(404, "capture not found")
     check_technician_self(user, capture.technician_id)
+
+    if not file_exists(capture.id):
+        raise HTTPException(
+            400,
+            "no media has been uploaded for this capture yet — PUT the actual "
+            "photo/video bytes to the upload_url returned by /captures/init first",
+        )
 
     result = run_verification(db, capture)
     capture.status = result["status"]

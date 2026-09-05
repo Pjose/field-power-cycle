@@ -38,6 +38,25 @@ actual computation.
 - **A real append-only audit log.** Every meaningful action writes to
   `AuditEvent` via `app/audit.py`. No route anywhere updates or deletes an
   audit event.
+- **Real authentication and authorization.** Bcrypt-hashed passwords, JWT
+  sessions, and role/ownership enforcement that actually rejects requests —
+  see the dedicated Authentication section below.
+- **Real object storage with real integrity verification.**
+  `app/storage.py` implements the same shape a real S3 integration would:
+  `POST /v1/captures/init` returns a genuinely signed, time-limited upload
+  URL (HMAC-signed, verified server-side, no Bearer token needed on the PUT
+  itself — the signature *is* the authorization, same as a real S3
+  pre-signed URL); `PUT` accepts real bytes, computes their real SHA-256,
+  and **rejects the upload** if it doesn't match the hash claimed at
+  `/captures/init` — closing a real integrity gap that existed before this:
+  a client could previously claim any hash with nothing checking it.
+  `/captures/{id}/complete` now refuses to run verification until real
+  media has actually been uploaded. Confirmed end-to-end: uploaded 2000
+  real bytes, had the server independently re-hash and verify them, then
+  retrieved the file back and confirmed it was byte-for-byte identical to
+  what was sent. Storage is local disk in this reference deployment —
+  swapping `save_file`/`read_file` for boto3 S3 calls doesn't require
+  touching any router code, since the interface is already shaped like it.
 - **A real, auto-generated API contract.** Run the server and visit `/docs`
   for live OpenAPI/Swagger docs generated from the actual code — the
   `field-powercycle-api-contract.md` doc describes the target shape; this is
@@ -56,19 +75,17 @@ not implemented:
   runs this as a separate cron job, Celery beat task, or cloud scheduler
   instead.
 
-- **Real object storage.** `/v1/captures/init` returns a mock `upload_url`
-  instead of a real S3/GCS pre-signed URL, and `/complete` doesn't expect an
-  actual file — there's no media storage layer here.
 - **Real SMS/email/push delivery.** The notification *rules* are modeled and
   toggleable, and every trigger condition writes a real audit event, but
   nothing calls out to Twilio/SendGrid/APNs. `GET /v1/notifications/feed`
   surfaces the audit events that *would* have fired a notification, marked
   `"logged"` rather than a fabricated `"delivered"`.
 - **A production secret management story.** `FPC_JWT_SECRET` falls back to
-  a randomly generated value at process start if not set via environment —
-  fine for this reference deployment, but it means every login token is
-  invalidated on restart, and a real deployment needs a real secret held
-  outside the process (see Authentication below).
+  a randomly generated value at process start if not set via environment,
+  and `FPC_UPLOAD_SECRET` (which signs media upload URLs) defaults to a
+  hardcoded dev value — fine for this reference deployment, but a real
+  deployment needs both held as real secrets outside the process (see
+  Authentication below).
 - **Device signing.** The API contract describes a `device_signature`
   binding GPS/timestamp to a capture at the moment of shutter-press. This
   backend accepts a `content_hash` but doesn't verify a real cryptographic
@@ -313,12 +330,22 @@ curl -X POST http://localhost:8000/v1/locations/ping -H "Authorization: Bearer $
 curl -X POST http://localhost:8000/v1/locations/ping -H "Authorization: Bearer $TECH_TOKEN" \
   -H "Content-Type: application/json" -d '{"technician_id":"T-118","lat":32.7801,"lng":-96.7989}'
 
-# 4. Capture proof inside the geofence — auto-verifies, satisfies the checklist item
-curl -X POST http://localhost:8000/v1/captures/init -H "Authorization: Bearer $TECH_TOKEN" \
+# 4. Capture proof inside the geofence — content_hash must be the REAL sha256
+#    of what you're about to upload, since the server checks it now
+echo -n "a real photo of the payment terminal" > /tmp/proof.bin
+REAL_HASH="sha256:$(sha256sum /tmp/proof.bin | cut -d' ' -f1)"
+INIT=$(curl -s -X POST http://localhost:8000/v1/captures/init -H "Authorization: Bearer $TECH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"job_id":"JB-4478","technician_id":"T-118","capture_type":"photo",
-       "content_hash":"sha256:aaa111","capture_lat":32.7801,"capture_lng":-96.7989}'
-curl -X POST http://localhost:8000/v1/captures/<capture_id>/complete -H "Authorization: Bearer $TECH_TOKEN"
+  -d "{\"job_id\":\"JB-4478\",\"technician_id\":\"T-118\",\"capture_type\":\"photo\",
+       \"content_hash\":\"$REAL_HASH\",\"capture_lat\":32.7801,\"capture_lng\":-96.7989}")
+CAPTURE_ID=$(echo "$INIT" | python3 -c "import json,sys;print(json.load(sys.stdin)['capture_id'])")
+UPLOAD_URL=$(echo "$INIT" | python3 -c "import json,sys;print(json.load(sys.stdin)['upload_url'])")
+
+# real upload — no Bearer token needed here, the signed URL is the authorization
+curl -X PUT "http://localhost:8000${UPLOAD_URL}" --data-binary @/tmp/proof.bin
+
+# only now will /complete succeed — it refuses to run verification without real uploaded media
+curl -X POST "http://localhost:8000/v1/captures/${CAPTURE_ID}/complete" -H "Authorization: Bearer $TECH_TOKEN"
 
 # 5. Once a job has real arrived_at/completed_at timestamps, generate an invoice
 curl -X POST http://localhost:8000/v1/invoices/generate/JB-4469 -H "Authorization: Bearer $TOKEN" \
@@ -346,16 +373,21 @@ backend/
     billing.py                Invoice line-item calculation
     audit.py                   Append-only event logging helper
     auth.py                     Real password hashing, JWT issuance, role/ownership checks
-    analytics_core.py            Shared aggregation logic (live summary AND snapshots use this)
-    analytics_snapshot.py         Real background scheduler + manual snapshot trigger
-    seed.py                        Seed data matching the frontend prototypes, plus demo users
+    storage.py                   Real local object storage — signed URLs, real hash verification
+    analytics_core.py             Shared aggregation logic (live summary AND snapshots use this)
+    analytics_snapshot.py          Real background scheduler + manual snapshot trigger
+    seed.py                         Seed data matching the frontend prototypes, plus demo users
     routers/
       auth.py                     Login + current-user endpoints
       locations.py                 GPS ping ingestion + geofence crossing
       jobs.py                       Job queue, assignment, candidate scoring
-      captures.py                   Capture init/complete — runs the verification engine
-      review.py                      Dispatcher review queue for flagged captures
-      notifications.py               Rule toggling + audit-backed activity feed
-      invoices.py                     Billing queue, invoice generation, invoice list
-      analytics.py                    Live summary + real historical snapshot endpoints
+      captures.py                    Capture init/complete — runs the verification engine
+      media.py                        Real upload/retrieval — see storage.py
+      review.py                        Dispatcher review queue for flagged captures
+      notifications.py                 Rule toggling + audit-backed activity feed
+      invoices.py                       Billing queue, invoice generation, invoice list
+      analytics.py                      Live summary + real historical snapshot endpoints
 ```
+
+`media/` (created at runtime, not checked in) holds the actual uploaded
+files — delete it along with the database to fully reset local state.

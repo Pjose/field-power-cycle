@@ -274,6 +274,32 @@ function getDeviceLocation(fallbackLat, fallbackLng){
   });
 }
 
+async function generateCapturePhoto(timeStr, locStr){
+  // Real image bytes, real hash — a canvas-rendered placeholder standing in
+  // for an actual camera photo (this is a browser demo, not a native app
+  // with camera access), but everything downstream of this point is
+  // genuine: the blob really gets hashed, really gets uploaded, and the
+  // server really re-hashes what it received and compares.
+  const canvas = document.createElement('canvas');
+  canvas.width = 480; canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 480, 360);
+  grad.addColorStop(0, '#1D3A4E'); grad.addColorStop(1, '#0A1016');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 480, 360);
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 300, 480, 60);
+  ctx.fillStyle = '#CFE0EE';
+  ctx.font = '13px monospace';
+  ctx.fillText(`${timeStr} · ${locStr}`, 12, 322);
+  ctx.fillText(`${JOB_ID} · ${JOB_SITE.name}`, 12, 340);
+
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  const buf = await blob.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  const hashHex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return { blob, hash: 'sha256:' + hashHex };
+}
+
 async function loadJobFromAPI(){
   try{
     await ensureAuth();
@@ -472,14 +498,21 @@ async function showVerifyLive(timeStr, locStr, loc){
   `;
   document.getElementById('v-close').addEventListener('click', closeSheet);
 
-  const hash = 'sha256:' + Math.random().toString(16).slice(2) + Date.now();
   let result;
   try{
+    const { blob, hash } = await generateCapturePhoto(timeStr, locStr);
     const initRes = await fetchJSON(`${API_BASE}/v1/captures/init`, {method:'POST', body:{
       job_id: JOB_ID, technician_id: TECH_ID, checklist_item_id: activeTask.id,
       capture_type: captureMode.toLowerCase(),
       content_hash: hash, capture_lat: loc.lat, capture_lng: loc.lng,
     }});
+    // real upload — PUT the actual image bytes to the real signed URL;
+    // the server re-hashes them and will reject if they don't match `hash` above
+    const uploadRes = await fetch(`${API_BASE}${initRes.upload_url}`, {method: 'PUT', body: blob});
+    if(!uploadRes.ok){
+      const errBody = await uploadRes.json().catch(()=>({detail:'upload failed'}));
+      throw new Error(errBody.detail || 'upload failed');
+    }
     result = await fetchJSON(`${API_BASE}/v1/captures/${initRes.capture_id}/complete`, {method:'POST', body:{}});
   }catch(err){
     document.getElementById('v-icon').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
