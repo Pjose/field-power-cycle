@@ -9,6 +9,7 @@ from ..audit import log_event
 from ..verification import run_verification
 from ..auth import get_current_user, check_technician_self, actor_label
 from ..storage import generate_upload_token, file_exists
+from ..notification_dispatch import notify_client_job_completed
 
 router = APIRouter(prefix="/v1/captures", tags=["captures"])
 
@@ -101,6 +102,8 @@ def complete_capture(capture_id: str, user: models.User = Depends(get_current_us
             job.status = "done"
             job.completed_at = dt.datetime.utcnow()
             log_event(db, "job_completed", "job", job.id, actor="system:verification-engine", payload={})
+            db.flush()
+            notify_client_job_completed(db, job)
     else:
         log_event(db, "capture_flagged", "capture", capture.id, actor="system:verification-engine",
                    payload={"reason": result["reason"], "checks": result["checks"]})

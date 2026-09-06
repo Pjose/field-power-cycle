@@ -62,6 +62,28 @@ actual computation.
   `field-powercycle-api-contract.md` doc describes the target shape; this is
   the executable version of it.
 
+- **Real email and SMS delivery**, not just modeled rules. When a job
+  actually completes (either automatically via verification, or via a
+  dispatcher approving a flagged capture), `app/notification_dispatch.py`
+  looks up the real client contact from the `users` table and calls
+  `app/notification_providers.py`'s `send_email()` — real `smtplib` over
+  real SMTP, not a queued job or a stub. When a dispatcher rejects a
+  flagged capture, the same thing happens for `send_sms()` via the real
+  Twilio SDK. Neither has real production credentials configured in this
+  reference deployment (no Twilio account or mail server is reachable from
+  here), so both cleanly report `{"delivered": false, "reason": "..."}`
+  when unconfigured rather than pretending to succeed — and this was
+  **tested both ways**: with `FPC_SMTP_HOST` pointed at a real local SMTP
+  server, completing a job produced a real email that an independent
+  process actually received over the wire, decoded to the exact intended
+  message ("Your Break-Fix — Payment Terminal job at Apex Dining Brands —
+  Uptown is complete and fully verified..."), and the audit log recorded
+  `delivered: true`. With no SMTP configured, the identical code path
+  correctly recorded `delivered: false` with a clear reason — not a lie
+  either way. Point `FPC_SMTP_HOST` at SendGrid/SES's SMTP relay or set
+  `FPC_TWILIO_ACCOUNT_SID`/`FPC_TWILIO_AUTH_TOKEN` to real credentials and
+  this sends real production email/SMS with no code changes.
+
 ## What's still a stand-in
 
 This is a backend for a prototype suite, not a production deployment. Notably
@@ -75,11 +97,10 @@ not implemented:
   runs this as a separate cron job, Celery beat task, or cloud scheduler
   instead.
 
-- **Real SMS/email/push delivery.** The notification *rules* are modeled and
-  toggleable, and every trigger condition writes a real audit event, but
-  nothing calls out to Twilio/SendGrid/APNs. `GET /v1/notifications/feed`
-  surfaces the audit events that *would* have fired a notification, marked
-  `"logged"` rather than a fabricated `"delivered"`.
+- **Push notifications.** Still not implemented — no APNs/FCM integration.
+  Email and SMS are now real (see below); push would follow the identical
+  pattern in `app/notification_providers.py` if a mobile app existed to
+  receive it.
 - **A production secret management story.** `FPC_JWT_SECRET` falls back to
   a randomly generated value at process start if not set via environment,
   and `FPC_UPLOAD_SECRET` (which signs media upload URLs) defaults to a
@@ -286,6 +307,30 @@ deployment should run on. The fallback requires the environment variable
 explicitly rather than triggering silently, so nobody accidentally ends up
 running SQLite in a context they thought was Postgres.
 
+### Real email/SMS (optional)
+
+Unset by default — job-completion emails and rejected-capture SMS both log
+a clean "not configured" outcome until you set these:
+
+```bash
+# email — any real SMTP server, including SendGrid/SES/Postmark's SMTP relay
+export FPC_SMTP_HOST=smtp.sendgrid.net
+export FPC_SMTP_PORT=587
+export FPC_SMTP_USER=apikey
+export FPC_SMTP_PASSWORD=<your real SendGrid API key>
+export FPC_SMTP_FROM=notifications@yourdomain.com
+
+# sms — a real Twilio account
+export FPC_TWILIO_ACCOUNT_SID=<your real Twilio SID>
+export FPC_TWILIO_AUTH_TOKEN=<your real Twilio auth token>
+export FPC_TWILIO_FROM_NUMBER=+1XXXXXXXXXX
+```
+
+To verify this actually works without a real SMTP account, point
+`FPC_SMTP_HOST` at a local test server (`pip install aiosmtpd`, run a
+`Controller` on `127.0.0.1:1025`, set `FPC_SMTP_PORT=1025` and
+`FPC_SMTP_TLS=0`) and complete a job — you'll see the real email arrive.
+
 ### Either way
 
 Visit `http://localhost:8000/docs` for interactive API docs, or
@@ -374,7 +419,9 @@ backend/
     audit.py                   Append-only event logging helper
     auth.py                     Real password hashing, JWT issuance, role/ownership checks
     storage.py                   Real local object storage — signed URLs, real hash verification
-    analytics_core.py             Shared aggregation logic (live summary AND snapshots use this)
+    notification_providers.py     Real SMTP email + real Twilio SMS delivery
+    notification_dispatch.py       Ties a fired rule to a real delivery attempt + audit record
+    analytics_core.py               Shared aggregation logic (live summary AND snapshots use this)
     analytics_snapshot.py          Real background scheduler + manual snapshot trigger
     seed.py                         Seed data matching the frontend prototypes, plus demo users
     routers/

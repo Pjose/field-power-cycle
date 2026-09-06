@@ -7,6 +7,7 @@ from .. import models, schemas
 from ..database import get_db
 from ..audit import log_event
 from ..auth import require_roles, actor_label
+from ..notification_dispatch import notify_client_job_completed, notify_technician_recapture
 
 router = APIRouter(tags=["review"])
 
@@ -59,9 +60,10 @@ def resolve_capture(capture_id: str, body: schemas.ReviewResolveIn,
                 job.status = "done"
                 job.completed_at = dt.datetime.utcnow()
                 log_event(db, "job_completed", "job", job.id, actor=actor_label(user), payload={})
+                db.flush()
+                notify_client_job_completed(db, job)
     elif body.resolution == "rejected":
-        log_event(db, "notification_dispatched", "capture", capture.id, actor="system:notification-engine",
-                   payload={"rule": "Recapture requested", "recipient": capture.technician_id})
+        notify_technician_recapture(db, capture, body.note)
 
     db.commit()
     return {"capture_id": capture.id, "status": capture.status}

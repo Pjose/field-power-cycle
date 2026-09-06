@@ -155,6 +155,8 @@ class User(Base):
     technician_id = Column(String, ForeignKey("technicians.id"), nullable=True)  # set when role == technician
     client_name = Column(String, nullable=True)  # set when role == client — scopes visibility to this client's jobs
     active = Column(Boolean, default=True)
+    email = Column(String, nullable=True)  # real delivery target for send_email()
+    phone = Column(String, nullable=True)  # real delivery target for send_sms()
 
 
 class AnalyticsSnapshot(Base):
