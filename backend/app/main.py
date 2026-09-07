@@ -1,5 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 from sqlalchemy.orm import Session
 
 from . import models
@@ -34,6 +37,33 @@ app.include_router(notifications.feed_router)
 app.include_router(invoices.router)
 app.include_router(analytics.router)
 app.include_router(media.router)
+
+# The technician app is served as real static files from this same backend,
+# over real HTTP — not opened as a file:// path — specifically because a
+# service worker cannot be registered from file:// at all in any browser.
+# Explicit routes for manifest.json and sw.js come before the StaticFiles
+# mount so they get the correct MIME types and cache headers rather than
+# whatever Python's generic mimetypes guesser assigns to a .json/.js file.
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "technician-app")
+
+
+@app.get("/technician-app/manifest.json")
+def technician_app_manifest():
+    return FileResponse(os.path.join(STATIC_DIR, "manifest.json"), media_type="application/manifest+json")
+
+
+@app.get("/technician-app/sw.js")
+def technician_app_service_worker():
+    # no-cache so browsers always check for a new service worker version —
+    # a stale cached sw.js is a classic real-world PWA bug, not a demo concern
+    return FileResponse(
+        os.path.join(STATIC_DIR, "sw.js"),
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+app.mount("/technician-app", StaticFiles(directory=STATIC_DIR, html=True), name="technician-app")
 
 
 @app.on_event("startup")
